@@ -1,7 +1,7 @@
 <x-filament-widgets::widget>
     @include('porro-filament::styles')
 
-    <x-filament::section :heading="__('Site health')">
+    <x-filament::section :heading="__('Porro Site Health')" icon="porro-mark">
         <div class="porro-health">
             <p class="porro-health-muted" role="status">@include('porro-filament::summary')</p>
 
@@ -10,7 +10,7 @@
             @endif
 
             <p class="porro-health-small">
-                <x-filament::link :href="$pageUrl">{{ $more ? trans_choice('See :count more|See :count more', $more, ['count' => $more]) : __('Open Site health') }}</x-filament::link>
+                <x-filament::link :href="$pageUrl">{{ $more ? trans_choice('See :count more|See :count more', $more, ['count' => $more]) : __('Open Porro Site Health') }}</x-filament::link>
                 @unless ($connected)
                     <span class="porro-health-muted"> · {{ __('Connect Porro for uptime, SSL and domain checks') }}</span>
                 @endunless

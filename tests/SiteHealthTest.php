@@ -37,12 +37,13 @@ it('adds the Site health page to the panel', function () {
     expect(Filament::getPanel('admin')->getPages())->toContain(SiteHealthPage::class)
         ->and(Filament::getPanel('admin')->getWidgets())->toContain(SiteHealthWidget::class)
         ->and(SiteHealthPage::getSlug())->toBe('site-health')
-        ->and(SiteHealthPage::getNavigationLabel())->toBe('Site health');
+        ->and(SiteHealthPage::getNavigationLabel())->toBe('Porro Site Health')
+        ->and(SiteHealthPage::getNavigationIcon())->toBe('porro-mark');
 });
 
 it('leaves the panel’s other pages alone', function () {
-    expect(Dashboard::getNavigationLabel())->not->toBe('Site health')
-        ->and(Dashboard::getNavigationIcon())->not->toBe('heroicon-o-heart');
+    expect(Dashboard::getNavigationLabel())->not->toBe('Porro Site Health')
+        ->and(Dashboard::getNavigationIcon())->not->toBe('porro-mark');
 });
 
 it('shows the site’s health without a Porro account, with the connect command', function () {
@@ -51,6 +52,7 @@ it('shows the site’s health without a Porro account, with the connect command'
 
     Livewire::test(SiteHealthPage::class)
         ->assertSuccessful()
+        ->assertSee('Porro Site Health')
         ->assertSee('Checked on this site')
         ->assertSee('Filament '.strtok((string) InstalledVersions::getVersion('filament/filament'), '.').'.99.0 is available')
         ->assertSee('Scheduler isn’t running')
@@ -130,7 +132,7 @@ it('shows a dashboard widget with the top issues', function () {
     $this->actingAs(panelUser());
 
     Livewire::test(SiteHealthWidget::class)
-        ->assertSee('Site health')
+        ->assertSee('Porro Site Health')
         ->assertSee('SSL certificate expires in 9 days')
         ->assertSee(SiteHealthPage::getUrl());
 });

@@ -4,6 +4,9 @@ namespace Porro\Filament\Pages;
 
 use Filament\Pages\Page;
 use Filament\Panel;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 use Porro\Filament\PorroPlugin;
 use Porro\Filament\SiteHealthView;
 use Porro\Laravel\SiteHealth;
@@ -34,17 +37,29 @@ class SiteHealthPage extends Page
 
     public function getTitle(): string
     {
-        return __('Site health');
+        return __('Porro Site Health');
+    }
+
+    /**
+     * The title with the Porro mark in front, so the page always reads as
+     * Porro's.
+     */
+    public function getHeading(): Htmlable
+    {
+        return new HtmlString(Blade::render(
+            '<span style="display: inline-flex; align-items: center; gap: .6rem"><x-filament::icon icon="porro-mark" style="width: 1.75rem; height: 1.75rem" />{{ $title }}</span>',
+            ['title' => $this->getTitle()],
+        ));
     }
 
     public static function getNavigationLabel(): string
     {
-        return __('Site health');
+        return __('Porro Site Health');
     }
 
     public static function getNavigationIcon(): ?string
     {
-        return 'heroicon-o-heart';
+        return 'porro-mark';
     }
 
     public static function getNavigationGroup(): ?string
