@@ -19,6 +19,7 @@ use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Porro\Core\CrontabIo;
 use Porro\Filament\FilamentConnectorServiceProvider;
+use Porro\Filament\PorroPlugin;
 use Porro\Laravel\PorroServiceProvider;
 
 abstract class TestCase extends Orchestra
@@ -51,6 +52,7 @@ abstract class TestCase extends Orchestra
 
     protected function defineEnvironment($app): void
     {
+        $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         $app['config']->set('database.default', 'testing');
         $app['config']->set('cache.default', 'array');
         $app['config']->set('porro.url', 'https://porro.test');
@@ -64,6 +66,6 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel->default()->id('admin')->path('admin')->login();
+        return $panel->default()->id('admin')->path('admin')->login()->plugin(PorroPlugin::make());
     }
 }

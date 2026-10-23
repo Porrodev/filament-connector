@@ -1,18 +1,24 @@
 {
     "name": "porro/filament-connector",
-    "description": "Porro connector for Filament 3\u20135: Filament, Livewire and plugin versions plus panel checks, on top of the Laravel connector.",
+    "description": "Site health for Filament 3–5: security advisories, end-of-life PHP and Laravel, Filament and Laravel updates and the scheduler, on a panel page and dashboard widget. Free; connect Porro to add uptime, SSL, domain and server checks.",
     "type": "library",
     "license": "MIT",
     "homepage": "https://porro.dev",
     "keywords": [
-        "porro",
         "filament",
+        "filament-plugin",
         "laravel",
-        "monitoring"
+        "site health",
+        "security",
+        "advisories",
+        "end of life",
+        "updates",
+        "monitoring",
+        "porro"
     ],
     "require": {
         "php": "^8.2",
-        "porro/laravel-connector": "^0.1.2",
+        "porro/laravel-connector": "^0.2.0",
         "filament/filament": "^3.2|^4.0|^5.0"
     },
     "autoload": {
@@ -50,6 +56,13 @@
     },
     "support": {
         "issues": "https://github.com/Porrodev/filament-connector/issues",
-        "source": "https://github.com/Porrodev/filament-connector"
-    }
+        "source": "https://github.com/Porrodev/filament-connector",
+        "docs": "https://github.com/Porrodev/filament-connector#readme"
+    },
+    "authors": [
+        {
+            "name": "Porro",
+            "homepage": "https://porro.dev"
+        }
+    ]
 }
