@@ -1,4 +1,4 @@
-<ul class="porro-health-list {{ ($compact ?? false) ? '' : 'porro-health-aligned' }}">
+<ul class="porro-health-list {{ ($compact ?? false) ? 'porro-health-compact' : 'porro-health-aligned' }}">
     @foreach ($issues as $issue)
         <li class="porro-health-item">
             <div class="porro-health-badge">

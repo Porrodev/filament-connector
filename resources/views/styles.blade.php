@@ -20,5 +20,6 @@
         .porro-health-title { font-weight: 600; }
         .porro-health-title .porro-health-muted { font-weight: 400; }
         .porro-health-aligned .porro-health-badge { min-width: 8.5rem; }
+        .porro-health-compact .porro-health-badge { flex-basis: 100%; }
     </style>
 @endonce

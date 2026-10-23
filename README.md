@@ -4,7 +4,7 @@ A Site health page for Filament 3, 4 and 5 panels. It checks the app for the thi
 
 It's free and works on its own. If you use [Porro](https://porro.dev) to look after your sites, connecting it adds what can only be seen from outside: uptime, SSL certificates, domain expiry and the server's operating system.
 
-![Site health in a Filament panel](docs/filament-site-health.png)
+![The Site health page in a Filament panel on a site that isn't connected to Porro: a migration not run, the scheduler not running and three failed jobs, with the commands that fix them](docs/images/filament-site-health.png)
 
 ## Install
 
@@ -26,6 +26,8 @@ public function panel(Panel $panel): Panel
 ```
 
 That adds a **Site health** page and a lazy-loaded dashboard widget. No assets to publish or build.
+
+<img src="docs/images/filament-widget.png" alt="The Site health dashboard widget" width="400">
 
 ### Options
 
@@ -71,7 +73,9 @@ Porro watches every site you look after from outside: uptime from several region
 php artisan porro:connect <site key>
 ```
 
-The page then shows the site's open findings in Porro alongside the checks above, each linking to Porro. Connecting also sends Porro a signed report every 15 minutes on Laravel's scheduler: Filament, Livewire, plugin and package versions, each panel's id, path, whether it has a login and (from Filament 4) whether multi-factor authentication is required, plus the health facts above. Never content, users or settings values. Run `php artisan porro:status --json` to see exactly what would be sent, and see the [Laravel connector](https://github.com/Porrodev/laravel-connector) for config and commands.
+The page then shows the site's open findings in Porro alongside the checks above, each linking to Porro.
+
+![Site health connected to Porro, in dark mode: an end-of-life server, an expiring certificate and domain, and a slow region, above the checks run on the site](docs/images/filament-site-health-dark.png) Connecting also sends Porro a signed report every 15 minutes on Laravel's scheduler: Filament, Livewire, plugin and package versions, each panel's id, path, whether it has a login and (from Filament 4) whether multi-factor authentication is required, plus the health facts above. Never content, users or settings values. Run `php artisan porro:status --json` to see exactly what would be sent, and see the [Laravel connector](https://github.com/Porrodev/laravel-connector) for config and commands.
 
 `porro:connect` offers to add the scheduler's cron line; `php artisan porro:cron` adds it on its own.
 
@@ -79,6 +83,10 @@ The page then shows the site's open findings in Porro alongside the checks above
 
 - Filament 3.2, 4 or 5, Laravel 11–13, PHP 8.2+
 - Outbound HTTPS to `packagist.org`, `repo.packagist.org` and `endoflife.date` (and `app.porro.dev` once connected). Without it, the checks that need them say so and the rest still run.
+
+## Demo
+
+[Dog-ear Books](https://github.com/Porrodev/filament-demo) is a demo app with the plugin set up and things for it to find, a stand-in Porro for the connected view, and the end-to-end checks and screenshot script behind these images. `docs/images/filament-thumbnail.png` is the plugin directory's 2560 × 1440 thumbnail.
 
 ## External requests
 
