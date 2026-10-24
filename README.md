@@ -46,7 +46,21 @@ In order:
 1. Your `authorize()` callback, if you give one.
 2. A `viewPorroSiteHealth` gate, if your app defines one: `Gate::define('viewPorroSiteHealth', fn (User $user) => $user->is_admin);`
 3. Admins, when your users have the usual markers: an `isAdmin()` or `isSuperAdmin()` method, an `is_admin` attribute, or a spatie/laravel-permission `super_admin` or `admin` role.
-4. Otherwise, everyone who can use the panel. Only add the plugin to panels for your own team, not to a customer-facing panel, unless you restrict it as above.
+4. Otherwise, nobody. If your users have none of those markers, the page and widget stay hidden until you say who can see them, with a gate in a service provider's `boot()`:
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('viewPorroSiteHealth', fn (User $user) => in_array($user->email, ['ops@example.com']));
+```
+
+or with `authorize()` on the plugin:
+
+```php
+PorroPlugin::make()->authorize(fn (User $user) => $user->hasVerifiedEmail() && str_ends_with($user->email, '@youragency.com'));
+```
+
+To let everyone who can use the panel see it, use `->authorize(fn () => true)`. Only do that on a panel for your own team, never a customer-facing one.
 
 The page, the widget and **Check again** all check this on the server.
 

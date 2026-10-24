@@ -20,7 +20,7 @@ use Throwable;
  * Who can see it, in order: your authorize() callback; else a
  * "viewPorroSiteHealth" gate if you define one; else admins, for users
  * with isAdmin(), isSuperAdmin(), an is_admin attribute or a spatie
- * "super_admin" or "admin" role; else everyone who can use the panel.
+ * "super_admin" or "admin" role; else nobody, until you say who.
  */
 class PorroPlugin implements Plugin
 {
@@ -119,7 +119,9 @@ class PorroPlugin implements Plugin
             return Gate::forUser($user)->allows(self::GATE);
         }
 
-        return $this->isAdmin($user) ?? true;
+        // No way to tell who's an admin: keep it closed rather than show
+        // every panel user (perhaps a customer) the site's weak spots.
+        return $this->isAdmin($user) ?? false;
     }
 
     /**

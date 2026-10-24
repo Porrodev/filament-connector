@@ -25,10 +25,24 @@ beforeEach(function () {
     Filament::setCurrentPanel(Filament::getPanel('admin'));
 });
 
+/**
+ * An admin by default (is_admin), so they can see the page.
+ */
 function panelUser(array $attributes = []): User
 {
     $user = new User;
-    $user->forceFill($attributes + ['id' => 1, 'name' => 'Ada', 'email' => 'ada@example.com']);
+    $user->forceFill($attributes + ['id' => 1, 'name' => 'Ada', 'email' => 'ada@example.com', 'is_admin' => true]);
+
+    return $user;
+}
+
+/**
+ * A user with none of the admin markers the plugin knows.
+ */
+function plainUser(): User
+{
+    $user = new User;
+    $user->forceFill(['id' => 2, 'name' => 'Bea', 'email' => 'bea@example.com']);
 
     return $user;
 }
@@ -97,6 +111,29 @@ it('lets admins in by default and keeps other users out', function () {
 
     auth()->logout();
     expect(SiteHealthPage::canAccess())->toBeFalse();
+});
+
+it('keeps everyone out when it can’t tell who’s an admin', function () {
+    $this->actingAs(plainUser());
+
+    expect(SiteHealthPage::canAccess())->toBeFalse()
+        ->and(SiteHealthWidget::canView())->toBeFalse();
+
+    Livewire::test(SiteHealthPage::class)->assertForbidden();
+});
+
+it('lets the app open it up with the gate or authorize()', function () {
+    $this->actingAs(plainUser());
+
+    Gate::define(PorroPlugin::GATE, fn ($user) => $user->email === 'bea@example.com');
+    expect(SiteHealthPage::canAccess())->toBeTrue();
+
+    PorroPlugin::current()->authorize(fn () => false);
+    expect(SiteHealthPage::canAccess())->toBeFalse();
+
+    PorroPlugin::current()->authorize(fn () => true);
+    expect(SiteHealthPage::canAccess())->toBeTrue()
+        ->and(SiteHealthWidget::canView())->toBeTrue();
 });
 
 it('uses a viewPorroSiteHealth gate when the app defines one', function () {
