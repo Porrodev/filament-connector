@@ -7,6 +7,7 @@ use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
+use Porro\Filament\Pages\BlockingPage;
 use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\Widgets\SiteHealthWidget;
 use Throwable;
@@ -21,12 +22,21 @@ use Throwable;
  * "viewPorroSiteHealth" gate if you define one; else admins, for users
  * with isAdmin(), isSuperAdmin(), an is_admin attribute or a spatie
  * "super_admin" or "admin" role; else nobody, until you say who.
+ *
+ * Who can block and safelist IPs: your authorizeManage() callback; else
+ * a "managePorroBlocklist" gate; else whoever can see it.
  */
 class PorroPlugin implements Plugin
 {
     public const GATE = 'viewPorroSiteHealth';
 
+    public const MANAGE_GATE = 'managePorroBlocklist';
+
+    public const GROUP = 'Porro';
+
     protected ?Closure $authorize = null;
+
+    protected ?Closure $authorizeManage = null;
 
     protected bool $widget = true;
 
@@ -68,6 +78,16 @@ class PorroPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * @param  Closure(Authenticatable|null $user): bool  $using
+     */
+    public function authorizeManage(Closure $using): static
+    {
+        $this->authorizeManage = $using;
+
+        return $this;
+    }
+
     public function widget(bool $show = true): static
     {
         $this->widget = $show;
@@ -91,9 +111,11 @@ class PorroPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
+        // Both pages sit together, under "Porro" unless you pick a group.
         SiteHealthPage::configure($this->navigationGroup, $this->navigationSort);
+        BlockingPage::configure($this->navigationGroup, $this->navigationSort === null ? null : $this->navigationSort + 1);
 
-        $panel->pages([SiteHealthPage::class]);
+        $panel->pages([SiteHealthPage::class, BlockingPage::class]);
 
         if ($this->widget) {
             $panel->widgets([SiteHealthWidget::class]);
@@ -122,6 +144,23 @@ class PorroPlugin implements Plugin
         // No way to tell who's an admin: keep it closed rather than show
         // every panel user (perhaps a customer) the site's weak spots.
         return $this->isAdmin($user) ?? false;
+    }
+
+    public function canManage(?Authenticatable $user): bool
+    {
+        if (! $this->canView($user)) {
+            return false;
+        }
+
+        if ($this->authorizeManage) {
+            return (bool) ($this->authorizeManage)($user);
+        }
+
+        if (Gate::has(self::MANAGE_GATE)) {
+            return Gate::forUser($user)->allows(self::MANAGE_GATE);
+        }
+
+        return true;
     }
 
     /**

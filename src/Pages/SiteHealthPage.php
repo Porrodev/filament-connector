@@ -7,6 +7,7 @@ use Filament\Panel;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
+use Porro\Filament\Pages\Concerns\ManagesBlocklist;
 use Porro\Filament\PorroPlugin;
 use Porro\Filament\SiteHealthView;
 use Porro\Laravel\SiteHealth;
@@ -20,6 +21,8 @@ use Porro\Laravel\SiteHealth;
  */
 class SiteHealthPage extends Page
 {
+    use ManagesBlocklist;
+
     protected static ?string $porroGroup = null;
 
     protected static ?int $porroSort = null;
@@ -52,9 +55,12 @@ class SiteHealthPage extends Page
         ));
     }
 
+    /**
+     * "Site Health" under Porro; "Porro Site Health" in a group you chose.
+     */
     public static function getNavigationLabel(): string
     {
-        return __('Porro Site Health');
+        return static::$porroGroup === null ? __('Site Health') : __('Porro Site Health');
     }
 
     public static function getNavigationIcon(): ?string
@@ -64,7 +70,7 @@ class SiteHealthPage extends Page
 
     public static function getNavigationGroup(): ?string
     {
-        return static::$porroGroup;
+        return static::$porroGroup ?? __(PorroPlugin::GROUP);
     }
 
     public static function getNavigationSort(): ?int
@@ -94,6 +100,9 @@ class SiteHealthPage extends Page
      */
     protected function getViewData(): array
     {
-        return app(SiteHealthView::class)->data();
+        return app(SiteHealthView::class)->data() + [
+            'canManage' => static::canManage(),
+            'blockingUrl' => BlockingPage::getUrl(),
+        ];
     }
 }

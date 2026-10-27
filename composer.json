@@ -1,6 +1,6 @@
 {
     "name": "porro/filament-connector",
-    "description": "Site health for Filament 3–5: security advisories, end-of-life PHP and Laravel, Filament and Laravel updates and the scheduler, on a panel page and dashboard widget. Free; connect Porro to add uptime, SSL, domain and server checks.",
+    "description": "Site health for Filament 3\u20135: security advisories, end-of-life PHP and Laravel, Filament and Laravel updates and the scheduler, on a panel page and dashboard widget. Free; connect Porro to add uptime, SSL, domain and server checks.",
     "type": "library",
     "license": "MIT",
     "homepage": "https://porro.dev",
@@ -18,8 +18,9 @@
     ],
     "require": {
         "php": "^8.2",
-        "porro/laravel-connector": "^0.2.1",
-        "filament/filament": "^3.2|^4.0|^5.0"
+        "porro/laravel-connector": "dev-claude/activity as 0.3.0",
+        "filament/filament": "^3.2|^4.0|^5.0",
+        "porro/php-core": "dev-claude/activity-core as 0.3.0"
     },
     "autoload": {
         "psr-4": {
@@ -63,6 +64,16 @@
         {
             "name": "Porro",
             "homepage": "https://porro.dev"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/Porrodev/laravel-connector"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/Porrodev/php-core"
         }
     ]
 }

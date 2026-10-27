@@ -53,6 +53,10 @@
             </div>
         </x-filament::section>
 
+        @if ($activity)
+            @include('porro-filament::activity')
+        @endif
+
         @unless ($connected)
             <x-filament::section :heading="__('Watch this site from outside too')">
                 <div class="porro-health-stack">

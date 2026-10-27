@@ -1,0 +1,193 @@
+<?php
+
+use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
+use Livewire\Livewire;
+use Porro\Core\Activity\Entry;
+use Porro\Core\Activity\Recorder;
+use Porro\Filament\Pages\BlockingPage;
+use Porro\Filament\Pages\SiteHealthPage;
+use Porro\Filament\PorroPlugin;
+use Porro\Laravel\Activity\Activity;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Http::fake(['*' => Http::response([], 200)]);
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+});
+
+it('sits next to Site Health under Porro', function () {
+    expect(Filament::getPanel('admin')->getPages())->toContain(BlockingPage::class)
+        ->and(BlockingPage::getNavigationLabel())->toBe('Blocking')
+        ->and(BlockingPage::getNavigationGroup())->toBe('Porro')
+        ->and(BlockingPage::getSlug())->toBe('blocking');
+});
+
+it('names both pages after Porro in a group you pick', function () {
+    SiteHealthPage::configure('Settings', null);
+    BlockingPage::configure('Settings', null);
+
+    expect(SiteHealthPage::getNavigationLabel())->toBe('Porro Site Health')
+        ->and(BlockingPage::getNavigationLabel())->toBe('Porro Blocking')
+        ->and(BlockingPage::getNavigationGroup())->toBe('Settings');
+
+    SiteHealthPage::configure(null, null);
+    BlockingPage::configure(null, null);
+});
+
+it('lists the blocklist, safelist and protected ranges', function () {
+    config(['porro.blocklist.safelist' => [['cidr' => '81.2.69.0/24', 'note' => 'Office']]]);
+    DB::table('porro_blocklist')->insert((new Entry('103.75.190.0/24', 'Scanner network', Entry::MANUAL, time(), null, 'Ada'))->toArray());
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->assertSuccessful()
+        ->assertSee('Where blocks are enforced')
+        ->assertSee('103.75.190.0/24')
+        ->assertSee('Scanner network')
+        ->assertSee('81.2.69.0/24')
+        ->assertSee('From config')
+        ->assertSee('Laravel Forge')
+        ->assertSee('PORRO_BLOCK_NGINX=true');
+});
+
+it('blocks from the form and turns the IP away', function () {
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->set('ip', '185.220.101.4')
+        ->set('reason', 'Scanner')
+        ->set('days', 7)
+        ->call('addBlock')
+        ->assertNotified('Blocked 185.220.101.4.')
+        ->assertSet('ip', '')
+        ->assertSee('185.220.101.4');
+
+    expect(DB::table('porro_blocklist')->value('note'))->toBe('Scanner');
+
+    $this->withServerVariables(['REMOTE_ADDR' => '185.220.101.4'])->get('/')->assertForbidden();
+});
+
+it('explains a refusal and keeps what was typed', function () {
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->set('ip', '159.203.150.232')
+        ->call('addBlock')
+        ->assertNotified('159.203.150.232 is a Laravel Forge address, which has to reach this site.')
+        ->assertSet('ip', '159.203.150.232');
+
+    expect(DB::table('porro_blocklist')->count())->toBe(0);
+});
+
+it('safelists with a label and asks before a wide range', function () {
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->set('safeIp', '5.0.0.0/8')->set('safeLabel', 'ISP')
+        ->call('addSafe')
+        ->assertNotified('5.0.0.0/8 covers 16,777,216 addresses. Confirm to safelist all of them.')
+        ->set('confirmWide', true)
+        ->call('addSafe')
+        ->assertNotified('Safelisted 5.0.0.0/8.');
+
+    expect(DB::table('porro_safelist')->pluck('cidr')->all())->toBe(['5.0.0.0/8']);
+});
+
+it('removes entries, but not safelist entries from config', function () {
+    config(['porro.blocklist.safelist' => ['81.2.69.142']]);
+    DB::table('porro_blocklist')->insert((new Entry('185.220.101.4', 'x', Entry::MANUAL, time()))->toArray());
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->call('unblockIp', '185.220.101.4')
+        ->assertNotified('Unblocked 185.220.101.4.')
+        ->call('unsafelistIp', '81.2.69.142')
+        ->assertNotified('81.2.69.142 comes from the site’s config, so it can only be removed there.');
+
+    expect(DB::table('porro_blocklist')->count())->toBe(0);
+});
+
+it('prefills the safelist from a flagged IP', function () {
+    $this->actingAs(panelUser());
+
+    $this->get(BlockingPage::getUrl(['safelist' => '81.2.69.142']))->assertOk()->assertSee('81.2.69.142');
+});
+
+it('lets viewers look but only managers change the lists', function () {
+    Gate::define(PorroPlugin::MANAGE_GATE, fn ($user) => $user->email === 'boss@example.com');
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->assertSuccessful()
+        ->assertDontSee('Wide range is OK')
+        ->call('blockIp', '185.220.101.4')
+        ->assertForbidden();
+
+    $this->actingAs(panelUser(['email' => 'boss@example.com']));
+    Livewire::test(BlockingPage::class)->assertSee('Wide range is OK');
+});
+
+it('is hidden from people who can’t see Site Health', function () {
+    $this->actingAs(plainUser());
+
+    expect(BlockingPage::canAccess())->toBeFalse();
+});
+
+describe('activity on Site Health', function () {
+    beforeEach(function () {
+        $recorder = app(Activity::class)->recorder();
+
+        foreach (['/.env', '/.git/config', '/backup.zip'] as $path) {
+            $recorder->record('185.220.101.4', Recorder::PROBE, 'GET', $path, 404, country: 'DE');
+        }
+    });
+
+    it('lists flagged IPs with their country and block buttons', function () {
+        $this->actingAs(panelUser());
+
+        Livewire::test(SiteHealthPage::class)
+            ->assertSee('Suspicious activity')
+            ->assertSee('185.220.101.4')
+            ->assertSee('🇩🇪 DE')
+            ->assertSee('probe 3')
+            ->assertSee('Block 7 days')
+            ->assertSee('1 IP probing for secrets and admin tools');
+    });
+
+    it('renders buttons the browser can run', function () {
+        $this->actingAs(panelUser());
+
+        // Blade doesn't compile @js inside a component's attributes; it
+        // would reach the browser as text and Livewire couldn't parse it.
+        $html = html_entity_decode(Livewire::test(SiteHealthPage::class)->html(), ENT_QUOTES);
+
+        expect($html)->not->toContain('@js(')
+            ->toContain("wire:click=\"blockIp('185.220.101.4', 7, 'Flagged: probe ×3', true)\"");
+
+        DB::table('porro_blocklist')->insert((new Entry('103.75.190.11', 'x', Entry::MANUAL, time()))->toArray());
+
+        expect(html_entity_decode(Livewire::test(BlockingPage::class)->html(), ENT_QUOTES))
+            ->not->toContain('@js(')
+            ->toContain("wire:click=\"unblockIp('103.75.190.11')\"");
+    });
+
+    it('blocks for 7 days as a suggestion, then shows it as blocked', function () {
+        $this->actingAs(panelUser());
+
+        Livewire::test(SiteHealthPage::class)
+            ->call('blockIp', '185.220.101.4', 7, 'Flagged: probe ×3', true)
+            ->assertNotified('Blocked 185.220.101.4.')
+            ->assertSee('Blocked')
+            ->assertDontSee('Block 7 days');
+
+        $row = DB::table('porro_blocklist')->first();
+
+        expect($row->source)->toBe('suggested')
+            ->and((int) $row->expires_at)->toBeGreaterThan(time() + 6 * 86400);
+    });
+});

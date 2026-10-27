@@ -25,7 +25,7 @@ public function panel(Panel $panel): Panel
 }
 ```
 
-That adds a **Porro Site Health** page, with the Porro mark in the navigation, and a lazy-loaded dashboard widget. No assets to publish or build.
+That adds a **Porro** group to the navigation with **Site Health** and **Blocking**, plus a lazy-loaded dashboard widget. Run `php artisan migrate` for the blocklist tables. No assets to publish or build.
 
 <img src="docs/images/filament-widget.png" alt="The Porro Site Health dashboard widget" width="400">
 
@@ -34,9 +34,10 @@ That adds a **Porro Site Health** page, with the Porro mark in the navigation, a
 ```php
 PorroPlugin::make()
     ->widget(false)                 // no dashboard widget
-    ->navigationGroup('Settings')   // where the page sits in the navigation
+    ->navigationGroup('Settings')   // instead of "Porro": the pages become "Porro Site Health" and "Porro Blocking"
     ->navigationSort(90)
-    ->authorize(fn ($user) => $user->can('view site health'));
+    ->authorize(fn ($user) => $user->can('view site health'))
+    ->authorizeManage(fn ($user) => $user->can('block ips'));   // who can block and safelist
 ```
 
 ### Who can see it
@@ -62,7 +63,33 @@ PorroPlugin::make()->authorize(fn (User $user) => $user->hasVerifiedEmail() && s
 
 To let everyone who can use the panel see it, use `->authorize(fn () => true)`. Only do that on a panel for your own team, never a customer-facing one.
 
-The page, the widget and **Check again** all check this on the server.
+The pages, the widget and **Check again** all check this on the server.
+
+### Who can block and safelist
+
+Whoever can see the pages, unless you narrow it. In order:
+
+1. Your `authorizeManage()` callback.
+2. Otherwise, a `managePorroBlocklist` gate.
+
+Everyone else sees the lists but no buttons, and the server refuses their changes too.
+
+## Suspicious activity and blocking
+
+Free, and on the app itself. IP addresses never leave it.
+
+- **What Site Health shows:**
+  - probes for files like `/.env` and `/.git`
+  - failed logins on any guard, the panel's included
+  - bursts of 404s and form floods
+  - each flagged IP with its rough country, and **Block 7 days**, **Block permanently** and **Safelist** buttons
+- **Exposed files:** if `/.env` or `/.git` ever answers, that's raised as **Act now**.
+- **The Blocking page:**
+  - **Lists:** the blocklist and safelist, and the ranges that can never be blocked: Cloudflare, Laravel Forge and its health checks, private addresses.
+  - **Refusals:** a block that would take the site down is refused, with the reason. That covers those ranges, your own IP and very wide ranges.
+- **How blocks are enforced:** blocked IPs get a plain 403 before the app runs. With `PORRO_BLOCK_NGINX=true`, nginx can block them too, and the page shows the setup steps.
+- **Production only:** activity is recorded in production only (`PORRO_ACTIVITY=true` to record elsewhere).
+- **Country:** comes from Cloudflare when the site is behind it. Otherwise it comes from [DB-IP](https://db-ip.com)'s free country file, downloaded monthly to `storage/porro`.
 
 ## What it checks
 
