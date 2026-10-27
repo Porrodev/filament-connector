@@ -54,27 +54,29 @@ php artisan porro:cloudflare connect</code></pre>
                 </li>
                 <li class="porro-health-item">
                     <div class="porro-health-body porro-health-stack">
+                        @php($loaded = collect($enforcement['servers'])->where('ok', true)->count())
                         <p class="porro-health-title">nginx
-                            <x-filament::badge :color="$enforcement['nginx'] && $enforcement['production'] && $enforcement['nginxWritten'] ? 'success' : ($enforcement['nginx'] && $enforcement['production'] ? 'warning' : 'gray')" size="sm" style="display: inline-flex; margin-left: .25rem">
+                            <x-filament::badge :color="! $enforcement['nginx'] || ! $enforcement['production'] ? 'gray' : ($enforcement['servers'] && $loaded === count($enforcement['servers']) ? 'success' : 'warning')" size="sm" style="display: inline-flex; margin-left: .25rem">
                                 @if (! $enforcement['nginx'])
                                     {{ __('Not set up') }}
                                 @elseif (! $enforcement['production'])
                                     {{ __('Production only') }}
-                                @elseif ($enforcement['nginxWritten'])
-                                    {{ __('File written :ago', ['ago' => $enforcement['nginxWritten']]) }}
+                                @elseif ($enforcement['servers'] && $loaded === count($enforcement['servers']))
+                                    {{ __('Loaded') }}
                                 @else
-                                    {{ __('Waiting for the first sync') }}
+                                    {{ __('Setting up') }}
                                 @endif
                             </x-filament::badge>
                         </p>
-                        @if ($enforcement['nginx'])
-                            <p class="porro-health-muted">{{ __('On each server: include the file in the site’s nginx config (Forge: Site → Edit Nginx Configuration, inside server { }), real IP lines first when behind Cloudflare.') }}</p>
-                            <pre class="porro-health-code"><code>{{ $enforcement['realIp'] }}{{ $enforcement['include'] }}</code></pre>
-                            <p class="porro-health-muted">{{ __('Then reload nginx when the list changes: a scheduled job as root, every minute (Forge: Server → Scheduler).') }}</p>
-                            <pre class="porro-health-code"><code>{{ $enforcement['reload'] }}</code></pre>
-                        @else
-                            <p class="porro-health-muted">{{ __('For sites not behind Cloudflare: set PORRO_BLOCK_NGINX=true and this page shows the two one-time steps for each server.') }}</p>
-                        @endif
+                        <p class="porro-health-muted">
+                            @if ($enforcement['servers'])
+                                {{ trans_choice(':loaded of :count server loaded|:loaded of :count servers loaded', count($enforcement['servers']), ['loaded' => $loaded, 'count' => count($enforcement['servers'])]) }} ·
+                                <x-filament::link :href="$nginxUrl">{{ __('Setup and servers') }} →</x-filament::link>
+                            @else
+                                {{ __('For sites not behind Cloudflare, or as well as it. Two one-time steps on each server.') }}
+                                <x-filament::link :href="$nginxUrl">{{ __('Set up nginx') }} →</x-filament::link>
+                            @endif
+                        </p>
                     </div>
                 </li>
             </ul>

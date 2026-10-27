@@ -109,6 +109,7 @@ class BlockingPage extends Page
         return app(SiteHealthView::class)->blocking() + [
             'canManage' => static::canManage(),
             'healthUrl' => SiteHealthPage::getUrl(),
+            'nginxUrl' => NginxPage::getUrl(),
         ];
     }
 }
