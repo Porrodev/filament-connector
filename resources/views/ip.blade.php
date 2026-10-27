@@ -29,12 +29,12 @@
 
         @if ($canManage && ! $details['blocked'] && ! $details['safelisted'])
             <div class="porro-health-actions" style="justify-content: flex-start; flex-wrap: wrap">
-                <x-filament::button wire:click="blockIp({{ \Illuminate\Support\Js::from($details['ip']) }}, 0, {{ \Illuminate\Support\Js::from($details['reason']) }})">{{ __('Block permanently') }}</x-filament::button>
-                <x-filament::button color="gray" wire:click="blockIp({{ \Illuminate\Support\Js::from($details['ip']) }}, 7, {{ \Illuminate\Support\Js::from($details['reason']) }}, true)">{{ __('Block 7 days') }}</x-filament::button>
+                <x-filament::button wire:confirm="{{ \Porro\Laravel\Activity\Confirm::block($details['ip']) }}" wire:click="blockIp({{ \Illuminate\Support\Js::from($details['ip']) }}, 0, {{ \Illuminate\Support\Js::from($details['reason']) }})">{{ __('Block permanently') }}</x-filament::button>
+                <x-filament::button color="gray" wire:confirm="{{ \Porro\Laravel\Activity\Confirm::block($details['ip'], 7) }}" wire:click="blockIp({{ \Illuminate\Support\Js::from($details['ip']) }}, 7, {{ \Illuminate\Support\Js::from($details['reason']) }}, true)">{{ __('Block 7 days') }}</x-filament::button>
                 @if ($details['range'])
-                    <x-filament::button color="gray" wire:click="blockIp({{ \Illuminate\Support\Js::from($details['range']) }}, 7, {{ \Illuminate\Support\Js::from($details['reason']) }}, true)">{{ __('Block :range', ['range' => $details['range']]) }}</x-filament::button>
+                    <x-filament::button color="gray" wire:confirm="{{ \Porro\Laravel\Activity\Confirm::block($details['range'], 7) }}" wire:click="blockIp({{ \Illuminate\Support\Js::from($details['range']) }}, 7, {{ \Illuminate\Support\Js::from($details['reason']) }}, true)">{{ __('Block :range', ['range' => $details['range']]) }}</x-filament::button>
                 @endif
-                <x-filament::link :href="$blockingUrl.'?safelist='.urlencode($details['ip'])">{{ __('Safelist') }}</x-filament::link>
+                <x-filament::link tag="button" wire:confirm="{{ \Porro\Laravel\Activity\Confirm::safelist($details['ip']) }}" wire:click="safelistIp({{ \Illuminate\Support\Js::from($details['ip']) }}, {{ \Illuminate\Support\Js::from(__('From the IP details page')) }})">{{ __('Safelist') }}</x-filament::link>
             </div>
         @endif
 

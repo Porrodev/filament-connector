@@ -19,6 +19,7 @@ use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\PorroPlugin;
 use Porro\Laravel\Activity\Activity;
 use Porro\Laravel\Activity\CloudflareMode;
+use Porro\Laravel\Activity\Confirm;
 
 uses(RefreshDatabase::class);
 
@@ -315,6 +316,22 @@ describe('IP details', function () {
             ->call('blockIp', '185.220.101.4', 7, 'Flagged', true)
             ->assertNotified('Blocked 185.220.101.4.')
             ->assertSee('blocked')
+            ->assertDontSee('Block permanently');
+    });
+
+    it('asks before every block and safelist, and safelists in one click', function () {
+        $page = Livewire::withQueryParams(['ip' => '185.220.101.4'])->test(IpPage::class);
+
+        expect(substr_count($page->html(), 'wire:confirm='))->toBe(3)
+            ->and($page->html())->toContain(e(Confirm::block('185.220.101.4')))
+            ->toContain(e(Confirm::block('185.220.101.4', 7)))
+            ->toContain(e(Confirm::safelist('185.220.101.4')));
+
+        expect(substr_count(Livewire::test(SiteHealthPage::class)->html(), 'wire:confirm='))->toBe(3);
+
+        $page->call('safelistIp', '185.220.101.4', 'From the IP details page')
+            ->assertNotified('Safelisted 185.220.101.4.')
+            ->assertSee('safelisted')
             ->assertDontSee('Block permanently');
     });
 

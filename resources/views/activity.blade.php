@@ -50,9 +50,9 @@
                                         @if ($ip['blocked'])
                                             <x-filament::badge color="danger" size="sm">{{ __('Blocked') }}</x-filament::badge>
                                         @else
-                                            <x-filament::button size="xs" color="gray" wire:click="blockIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, 7, {{ \Illuminate\Support\Js::from($ip['reason']) }}, true)">{{ __('Block 7 days') }}</x-filament::button>
-                                            <x-filament::button size="xs" color="gray" wire:click="blockIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, 0, {{ \Illuminate\Support\Js::from($ip['reason']) }})">{{ __('Block permanently') }}</x-filament::button>
-                                            <x-filament::link size="sm" :href="$blockingUrl.'?safelist='.urlencode($ip['ip'])">{{ __('Safelist') }}</x-filament::link>
+                                            <x-filament::button size="xs" color="gray" wire:confirm="{{ \Porro\Laravel\Activity\Confirm::block($ip['ip'], 7) }}" wire:click="blockIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, 7, {{ \Illuminate\Support\Js::from($ip['reason']) }}, true)">{{ __('Block 7 days') }}</x-filament::button>
+                                            <x-filament::button size="xs" color="gray" wire:confirm="{{ \Porro\Laravel\Activity\Confirm::block($ip['ip']) }}" wire:click="blockIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, 0, {{ \Illuminate\Support\Js::from($ip['reason']) }})">{{ __('Block permanently') }}</x-filament::button>
+                                            <x-filament::link size="sm" tag="button" wire:confirm="{{ \Porro\Laravel\Activity\Confirm::safelist($ip['ip']) }}" wire:click="safelistIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, {{ \Illuminate\Support\Js::from(__('From the activity table')) }})">{{ __('Safelist') }}</x-filament::link>
                                         @endif
                                     </div>
                                 </td>
