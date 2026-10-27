@@ -2,6 +2,7 @@
 
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,7 @@ use Porro\Filament\Pages\BlockingPage;
 use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\PorroPlugin;
 use Porro\Laravel\Activity\Activity;
+use Porro\Laravel\Activity\CloudflareMode;
 
 uses(RefreshDatabase::class);
 
@@ -199,4 +201,28 @@ describe('activity on Site Health', function () {
         expect($row->source)->toBe('suggested')
             ->and((int) $row->expires_at)->toBeGreaterThan(time() + 6 * 86400);
     });
+});
+
+it('shows Cloudflare WAF mode on the Blocking page', function () {
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)->assertSee('Cloudflare WAF')->assertSee('Not set up')->assertSee('PORRO_CLOUDFLARE_TOKEN=your-token-here');
+
+    config(['porro.blocklist.cloudflare_token' => 'token']);
+    Livewire::test(BlockingPage::class)->assertSee('Token set, not connected')->assertSee('php artisan porro:cloudflare connect');
+
+    $this->app['env'] = 'production';
+    Cache::forever(CloudflareMode::STATE, [
+        'connection' => ['zone_name' => 'dogearbooks.example'],
+        'synced_at' => time() - 120,
+        'result' => ['added' => 1, 'removed' => 0, 'shared' => 2],
+        'error' => null,
+    ]);
+    Livewire::test(BlockingPage::class)->assertSee('Synced 2 minutes ago')->assertSee('zone dogearbooks.example')->assertSee('2 already blocked by other sites');
+
+    Cache::forever(CloudflareMode::STATE, [
+        'connection' => ['zone_name' => 'dogearbooks.example'],
+        'error' => 'Cloudflare refused the token <b>',
+    ]);
+    Livewire::test(BlockingPage::class)->assertSee('Sync failed')->assertSee('Cloudflare refused the token <b>')->assertDontSeeHtml('token <b>');
 });

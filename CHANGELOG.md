@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The Blocking page shows Cloudflare WAF mode:** whether it's set up and connected, the zone, the last sync, IPs already blocked by another site on the account, and any error. Until it's connected, it shows the setup steps. Requires `porro/laravel-connector`'s Cloudflare WAF mode.
 - **Navigation:** a **Porro** navigation group with **Site Health** and a new **Blocking** page. `navigationGroup()` still moves both; in your own group they're called "Porro Site Health" and "Porro Blocking".
 - **Suspicious activity on Site Health:** probes, failed logins, 404 bursts and form floods, with each flagged IP's rough country and buttons to block or safelist it. An exposed `/.env` or `/.git` shows as **Act now**.
 - **The Blocking page:** the blocklist, safelist and protected ranges. Blocks that would break the site are refused with the reason, shown as a notification.

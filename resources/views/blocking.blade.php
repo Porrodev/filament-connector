@@ -20,6 +20,40 @@
                 </li>
                 <li class="porro-health-item">
                     <div class="porro-health-body porro-health-stack">
+                        <p class="porro-health-title">Cloudflare WAF
+                            <x-filament::badge :color="match (true) { ! $cloudflare['configured'] => 'gray', (bool) $cloudflare['error'] => 'danger', $cloudflare['connected'] && $cloudflare['production'] && (bool) $cloudflare['synced'] => 'success', default => 'warning' }" size="sm" style="display: inline-flex; margin-left: .25rem">
+                                @if (! $cloudflare['configured'])
+                                    {{ __('Not set up') }}
+                                @elseif (! $cloudflare['connected'])
+                                    {{ __('Token set, not connected') }}
+                                @elseif ($cloudflare['error'])
+                                    {{ __('Sync failed') }}
+                                @elseif (! $cloudflare['production'])
+                                    {{ __('Production only') }}
+                                @elseif ($cloudflare['synced'])
+                                    {{ __('Synced :ago', ['ago' => $cloudflare['synced']]) }}
+                                @else
+                                    {{ __('Waiting for the first sync') }}
+                                @endif
+                            </x-filament::badge>
+                        </p>
+                        @if ($cloudflare['connected'])
+                            <p class="porro-health-muted">{{ __('Blocked at the edge, before traffic reaches the server · zone :zone · list porro_blocklist', ['zone' => $cloudflare['zone']]) }}@if ($cloudflare['result'] && $cloudflare['result']['shared']) · {{ trans_choice(':count already blocked by another site|:count already blocked by other sites', $cloudflare['result']['shared'], ['count' => $cloudflare['result']['shared']]) }}@endif</p>
+                        @elseif ($cloudflare['configured'])
+                            <p class="porro-health-muted">{{ __('Run this on the server to find the zone, create the porro_blocklist list and add the rule next to your existing ones:') }}</p>
+                            <pre class="porro-health-code"><code>php artisan porro:cloudflare connect</code></pre>
+                        @else
+                            <p class="porro-health-muted">{{ __('Blocks at Cloudflare’s edge for sites behind it. Create a token with Account Filter Lists Edit, Zone WAF Edit and Zone Read, then:') }}</p>
+                            <pre class="porro-health-code"><code>PORRO_CLOUDFLARE_TOKEN=your-token-here
+php artisan porro:cloudflare connect</code></pre>
+                        @endif
+                        @if ($cloudflare['error'])
+                            <p style="color: rgb(220 38 38)">{{ $cloudflare['error'] }}</p>
+                        @endif
+                    </div>
+                </li>
+                <li class="porro-health-item">
+                    <div class="porro-health-body porro-health-stack">
                         <p class="porro-health-title">nginx
                             <x-filament::badge :color="$enforcement['nginx'] && $enforcement['production'] && $enforcement['nginxWritten'] ? 'success' : ($enforcement['nginx'] && $enforcement['production'] ? 'warning' : 'gray')" size="sm" style="display: inline-flex; margin-left: .25rem">
                                 @if (! $enforcement['nginx'])
