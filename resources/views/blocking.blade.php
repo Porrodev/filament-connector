@@ -123,10 +123,32 @@ php artisan porro:cloudflare connect</code></pre>
         </x-filament::section>
 
         <x-filament::section :heading="__('Always protected')" :description="__('Can’t be blocked')">
-            <p class="porro-health-muted porro-health-small">{{ __('Infrastructure that has to reach this site. Blocks that overlap these are refused, and removed if a list changes.') }}</p>
+            <p class="porro-health-muted porro-health-small">{{ __('Addresses that have to reach this site. Blocks that overlap these are refused, and removed if a list changes. Open one to see its addresses and why.') }}</p>
             <ul class="porro-health-list porro-health-gap">
                 @foreach ($protected as $row)
-                    <li class="porro-health-item porro-health-row"><span>{{ $row['label'] }}</span><span class="porro-health-muted">{{ trans_choice(':count range|:count ranges', $row['count'], ['count' => $row['count']]) }}</span></li>
+                    <li class="porro-health-item">
+                        <details class="porro-health-protected">
+                            <summary><span>{{ $row['label'] }}</span>
+                                @if ($row['on'])
+                                    <span class="porro-health-muted">{{ trans_choice(':count range|:count ranges', $row['count'], ['count' => $row['count']]) }}</span>
+                                @else
+                                    <x-filament::badge color="gray" size="sm">{{ __('Switched off') }}</x-filament::badge>
+                                @endif
+                            </summary>
+                            <div class="porro-health-stack porro-health-small" style="margin-top: .5rem">
+                                <p>{{ $row['why'] }}</p>
+                                @if ($row['from'])
+                                    <p class="porro-health-muted">{{ __('From') }}: @foreach ($row['from'] as $url)<x-filament::link :href="$url" target="_blank">{{ parse_url($url, PHP_URL_HOST) }}{{ parse_url($url, PHP_URL_PATH) }}</x-filament::link>@if (! $loop->last) · @endif @endforeach</p>
+                                @endif
+                                @if ($row['env'])
+                                    <p class="porro-health-muted">{{ $row['on'] ? __('Not needed here? Switch it off with :setting.', ['setting' => $row['env'].'=false']) : __('Switched off with :setting. Remove it to protect these again.', ['setting' => $row['env'].'=false']) }}</p>
+                                @endif
+                                @if ($row['ranges'])
+                                    <div class="porro-health-ranges">@foreach ($row['ranges'] as $range)<span>{{ $range }}</span>@endforeach</div>
+                                @endif
+                            </div>
+                        </details>
+                    </li>
                 @endforeach
             </ul>
         </x-filament::section>

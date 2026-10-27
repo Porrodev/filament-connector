@@ -35,5 +35,16 @@
         .porro-health-form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
         .porro-health-entry { align-items: center; font-size: .875rem; }
         .porro-health-row { justify-content: space-between; font-size: .875rem; }
+        .porro-health-copyable { display: flex; gap: .5rem; align-items: flex-start; }
+        .porro-health-copyable pre { flex: 1; min-width: 0; margin: 0; }
+        .porro-health-example span { display: block; min-height: 1.5em; }
+        .porro-health-example .porro-health-add { background: rgb(191 232 74 / .3); margin: 0 -.75rem; padding: 0 .75rem; font-weight: 600; }
+        .porro-health-example em { font-style: normal; font-weight: 400; opacity: .6; }
+        .porro-health-protected { width: 100%; }
+        .porro-health-protected summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+        .porro-health-protected summary::-webkit-details-marker { display: none; }
+        .porro-health-protected summary > span:first-child::before { content: '› '; opacity: .6; }
+        .porro-health-protected[open] summary > span:first-child::before { content: '⌄ '; }
+        .porro-health-ranges { display: grid; grid-template-columns: repeat(auto-fill, minmax(24ch, 1fr)); gap: 2px 16px; max-height: 240px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: .75rem; padding: .5rem .75rem; border-radius: .5rem; background: rgb(127 127 127 / .12); }
     </style>
 @endonce

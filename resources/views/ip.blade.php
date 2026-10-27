@@ -10,6 +10,7 @@
                 @if ($details['activity'] && $details['activity']['first']) · {{ __('first seen here :ago', ['ago' => $details['activity']['first']]) }} @endif
                 @if ($details['blocked']) · <span style="color: rgb(220 38 38)">{{ __('blocked') }}</span> @endif
                 @if ($details['safelisted']) · {{ __('safelisted') }} @endif
+                @if ($details['protected'] ?? null) · {{ __('always protected: :list', ['list' => $details['protected']]) }} @endif
             </p>
             @if ($details['badges'])
                 <div class="porro-health-chips">
@@ -27,7 +28,7 @@
             </div>
         @endif
 
-        @if ($canManage && ! $details['blocked'] && ! $details['safelisted'])
+        @if ($canManage && ! $details['blocked'] && ! $details['safelisted'] && ! ($details['protected'] ?? null))
             <div class="porro-health-actions" style="justify-content: flex-start; flex-wrap: wrap">
                 <x-filament::button wire:click="mountAction('confirmBlock', {{ \Illuminate\Support\Js::from(['ip' => $details['ip'], 'days' => 0, 'reason' => $details['reason'], 'suggested' => false]) }})">{{ __('Block permanently') }}</x-filament::button>
                 <x-filament::button color="gray" wire:click="mountAction('confirmBlock', {{ \Illuminate\Support\Js::from(['ip' => $details['ip'], 'days' => 7, 'reason' => $details['reason'], 'suggested' => true]) }})">{{ __('Block 7 days') }}</x-filament::button>
