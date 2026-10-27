@@ -10,6 +10,7 @@ use Livewire\Livewire;
 use Porro\Core\Activity\Entry;
 use Porro\Core\Activity\Recorder;
 use Porro\Filament\Pages\BlockingPage;
+use Porro\Filament\Pages\NginxPage;
 use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\PorroPlugin;
 use Porro\Laravel\Activity\Activity;
@@ -54,7 +55,7 @@ it('lists the blocklist, safelist and protected ranges', function () {
         ->assertSee('81.2.69.0/24')
         ->assertSee('From config')
         ->assertSee('Laravel Forge')
-        ->assertSee('PORRO_BLOCK_NGINX=true');
+        ->assertSee('Set up nginx');
 });
 
 it('blocks from the form and turns the IP away', function () {
@@ -225,4 +226,47 @@ it('shows Cloudflare WAF mode on the Blocking page', function () {
         'error' => 'Cloudflare refused the token <b>',
     ]);
     Livewire::test(BlockingPage::class)->assertSee('Sync failed')->assertSee('Cloudflare refused the token <b>')->assertDontSeeHtml('token <b>');
+});
+
+describe('nginx setup', function () {
+    beforeEach(function () {
+        $this->dir = sys_get_temp_dir().'/porro-nginx-'.bin2hex(random_bytes(4));
+        mkdir($this->dir.'/sites-enabled', 0755, true);
+        $this->file = $this->dir.'/nginx-blocklist.conf';
+        config([
+            'porro.blocklist.nginx' => true,
+            'porro.blocklist.nginx_path' => $this->file,
+            'porro.blocklist.nginx_config_dirs' => [$this->dir.'/sites-enabled'],
+            'porro.blocklist.nginx_stamp' => $this->dir.'/stamp',
+        ]);
+        $this->actingAs(panelUser());
+    });
+
+    it('is reached from Blocking, not the navigation', function () {
+        expect(Filament::getPanel('admin')->getPages())->toContain(NginxPage::class)
+            ->and(NginxPage::shouldRegisterNavigation())->toBeFalse();
+
+        Livewire::test(BlockingPage::class)->assertSee('Set up nginx');
+    });
+
+    it('shows the steps with this site’s paths, and each server', function () {
+        Livewire::test(NginxPage::class)
+            ->assertSee("include {$this->file};")
+            ->assertSee('No server has reported yet');
+
+        $this->app['env'] = 'production';
+        file_put_contents($this->dir.'/sites-enabled/site', "server {\n    include {$this->file};\n}\n");
+        $this->artisan('porro:blocklist-sync')->assertSuccessful();
+        touch($this->dir.'/stamp', time() + 5);
+        $this->artisan('porro:blocklist-sync')->assertSuccessful();
+
+        Livewire::test(NginxPage::class)->assertSee('Loaded')->assertSee('reloaded');
+        Livewire::test(BlockingPage::class)->assertSee('1 of 1 server loaded')->assertSee('Setup and servers');
+    });
+
+    it('is hidden from people who can’t see Site Health', function () {
+        $this->actingAs(plainUser());
+
+        expect(NginxPage::canAccess())->toBeFalse();
+    });
 });
