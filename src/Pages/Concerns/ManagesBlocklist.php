@@ -3,6 +3,7 @@
 namespace Porro\Filament\Pages\Concerns;
 
 use Closure;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Artisan;
 use Porro\Core\Activity\Blocklist;
@@ -10,6 +11,7 @@ use Porro\Core\Activity\Entry;
 use Porro\Core\Activity\Refused;
 use Porro\Filament\PorroPlugin;
 use Porro\Laravel\Activity\Activity;
+use Porro\Laravel\Activity\Confirm;
 use Porro\Laravel\SiteHealth;
 use Throwable;
 
@@ -37,6 +39,47 @@ trait ManagesBlocklist
             $this->who(),
             $activity->clientIp(request()),
         ), fn (Entry $entry) => __('Blocked :ip.', ['ip' => $entry->cidr]));
+    }
+
+    /**
+     * The block buttons open this with mountAction('confirmBlock', [ip, days,
+     * reason, suggested]): Filament's own confirmation modal, worded by the
+     * Laravel connector's Confirm so every panel asks the same thing.
+     */
+    public function confirmBlockAction(): Action
+    {
+        $ask = fn (array $arguments) => Confirm::block((string) ($arguments['ip'] ?? ''), (int) ($arguments['days'] ?? 0));
+
+        return Action::make('confirmBlock')
+            ->requiresConfirmation()
+            ->color('danger')
+            ->modalIcon('heroicon-o-no-symbol')
+            ->modalHeading(fn (array $arguments) => $ask($arguments)['title'])
+            ->modalDescription(fn (array $arguments) => $ask($arguments)['body'])
+            ->modalSubmitActionLabel(fn (array $arguments) => $ask($arguments)['button'])
+            ->visible(fn () => static::canManage())
+            ->action(fn (array $arguments) => $this->blockIp(
+                (string) $arguments['ip'],
+                (int) ($arguments['days'] ?? 0),
+                $arguments['reason'] ?? null,
+                (bool) ($arguments['suggested'] ?? false),
+            ));
+    }
+
+    /** Safelist in one click, once confirmed: mountAction('confirmSafelist', [ip, label]). */
+    public function confirmSafelistAction(): Action
+    {
+        $ask = fn (array $arguments) => Confirm::safelist((string) ($arguments['ip'] ?? ''));
+
+        return Action::make('confirmSafelist')
+            ->requiresConfirmation()
+            ->color('primary')
+            ->modalIcon('heroicon-o-shield-check')
+            ->modalHeading(fn (array $arguments) => $ask($arguments)['title'])
+            ->modalDescription(fn (array $arguments) => $ask($arguments)['body'])
+            ->modalSubmitActionLabel(fn (array $arguments) => $ask($arguments)['button'])
+            ->visible(fn () => static::canManage())
+            ->action(fn (array $arguments) => $this->safelistIp((string) $arguments['ip'], (string) ($arguments['label'] ?? '')));
     }
 
     public function unblockIp(string $ip): void

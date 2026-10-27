@@ -30,7 +30,10 @@
                 <tbody>
                     @foreach ($activity['flagged'] as $ip)
                         <tr wire:key="flagged-{{ $ip['ip'] }}">
-                            <td class="porro-health-mono">{{ $ip['ip'] }}</td>
+                            <td class="porro-health-mono">
+                                <x-filament::link :href="$ipUrl.'?ip='.urlencode($ip['ip'])">{{ $ip['ip'] }}</x-filament::link>
+                                @foreach ($ip['badges'] as $badge)<x-filament::badge :color="['danger' => 'danger', 'warning' => 'warning'][$badge['tone']] ?? 'gray'" size="sm" style="display: inline-flex; margin-left: .25rem">{{ $badge['label'] }}</x-filament::badge>@endforeach
+                            </td>
                             <td title="{{ $ip['country']['code'] ?? '' }}">{{ $ip['country']['label'] ?? '—' }}</td>
                             <td>
                                 <div class="porro-health-chips">
@@ -47,9 +50,9 @@
                                         @if ($ip['blocked'])
                                             <x-filament::badge color="danger" size="sm">{{ __('Blocked') }}</x-filament::badge>
                                         @else
-                                            <x-filament::button size="xs" color="gray" wire:click="blockIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, 7, {{ \Illuminate\Support\Js::from($ip['reason']) }}, true)">{{ __('Block 7 days') }}</x-filament::button>
-                                            <x-filament::button size="xs" color="gray" wire:click="blockIp({{ \Illuminate\Support\Js::from($ip['ip']) }}, 0, {{ \Illuminate\Support\Js::from($ip['reason']) }})">{{ __('Block permanently') }}</x-filament::button>
-                                            <x-filament::link size="sm" :href="$blockingUrl.'?safelist='.urlencode($ip['ip'])">{{ __('Safelist') }}</x-filament::link>
+                                            <x-filament::button size="xs" color="gray" wire:click="mountAction('confirmBlock', {{ \Illuminate\Support\Js::from(['ip' => $ip['ip'], 'days' => 7, 'reason' => $ip['reason'], 'suggested' => true]) }})">{{ __('Block 7 days') }}</x-filament::button>
+                                            <x-filament::button size="xs" color="gray" wire:click="mountAction('confirmBlock', {{ \Illuminate\Support\Js::from(['ip' => $ip['ip'], 'days' => 0, 'reason' => $ip['reason'], 'suggested' => false]) }})">{{ __('Block permanently') }}</x-filament::button>
+                                            <x-filament::button size="xs" color="gray" wire:click="mountAction('confirmSafelist', {{ \Illuminate\Support\Js::from(['ip' => $ip['ip'], 'label' => __('From the activity table')]) }})">{{ __('Safelist') }}</x-filament::button>
                                         @endif
                                     </div>
                                 </td>
