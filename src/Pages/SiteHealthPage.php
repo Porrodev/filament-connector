@@ -103,6 +103,7 @@ class SiteHealthPage extends Page
         return app(SiteHealthView::class)->data() + [
             'canManage' => static::canManage(),
             'blockingUrl' => BlockingPage::getUrl(),
+            'ipUrl' => IpPage::getUrl(),
         ];
     }
 }

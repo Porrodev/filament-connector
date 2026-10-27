@@ -2,14 +2,18 @@
 
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Porro\Core\Activity\AbuseIpdb;
 use Porro\Core\Activity\Entry;
+use Porro\Core\Activity\IpDetails;
 use Porro\Core\Activity\Recorder;
 use Porro\Filament\Pages\BlockingPage;
+use Porro\Filament\Pages\IpPage;
 use Porro\Filament\Pages\NginxPage;
 use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\PorroPlugin;
@@ -268,5 +272,67 @@ describe('nginx setup', function () {
         $this->actingAs(plainUser());
 
         expect(NginxPage::canAccess())->toBeFalse();
+    });
+});
+
+describe('IP details', function () {
+    beforeEach(function () {
+        // A fresh fake: the file's catch-all stub would otherwise answer first.
+        Http::swap(new Factory);
+        Http::fake([
+            IpDetails::TOR_URL => Http::response("185.220.101.4\n"),
+            'www.spamhaus.org/*' => Http::response(''),
+            AbuseIpdb::URL.'*' => Http::response(['data' => ['abuseConfidenceScore' => 100, 'totalReports' => 2048]]),
+            '*' => Http::response([], 200),
+        ]);
+        $this->app->instance('porro.reverse-dns', fn () => null);
+        $this->actingAs(panelUser());
+        $recorder = app(Activity::class)->recorder();
+
+        foreach (['/.env', '/.git/config', '/backup.zip'] as $path) {
+            $recorder->record('185.220.101.4', Recorder::PROBE, 'GET', $path, 404, country: 'DE', userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1)');
+        }
+    });
+
+    it('opens from the activity table and explains a fake crawler', function () {
+        Livewire::test(SiteHealthPage::class)->assertSee(IpPage::getUrl().'?ip=185.220.101.4');
+
+        Livewire::withQueryParams(['ip' => '185.220.101.4'])
+            ->test(IpPage::class)
+            ->assertSee('🇩🇪 DE')
+            ->assertSee('Tor exit')
+            ->assertSee('Fake Googlebot')
+            ->assertSee('Pretending to be Googlebot')
+            ->assertSee('/backup.zip');
+    });
+
+    it('blocks from the details page', function () {
+        Livewire::withQueryParams(['ip' => '185.220.101.4'])
+            ->test(IpPage::class)
+            ->call('blockIp', '185.220.101.4', 7, 'Flagged', true)
+            ->assertNotified('Blocked 185.220.101.4.')
+            ->assertSee('blocked')
+            ->assertDontSee('Block permanently');
+    });
+
+    it('checks AbuseIPDB only when asked, and only for managers', function () {
+        config(['porro.activity.abuseipdb_key' => 'k3y']);
+
+        $page = Livewire::withQueryParams(['ip' => '185.220.101.4'])->test(IpPage::class)->assertSee('Check on AbuseIPDB');
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'abuseipdb'));
+
+        $page->call('checkReputation')->assertSee('100%')->assertSee('2,048 reports');
+
+        Gate::define(PorroPlugin::MANAGE_GATE, fn () => false);
+        Livewire::withQueryParams(['ip' => '185.220.101.4'])->test(IpPage::class)
+            ->assertDontSee('Check on AbuseIPDB')
+            ->call('checkReputation')
+            ->assertForbidden();
+    });
+
+    it('404s without a real IP and stays out of the navigation', function () {
+        Livewire::withQueryParams(['ip' => '1.2.3'])->test(IpPage::class)->assertNotFound();
+
+        expect(IpPage::shouldRegisterNavigation())->toBeFalse();
     });
 });
