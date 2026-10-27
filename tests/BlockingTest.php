@@ -295,7 +295,10 @@ describe('IP details', function () {
     });
 
     it('opens from the activity table and explains a fake crawler', function () {
-        Livewire::test(SiteHealthPage::class)->assertSee(IpPage::getUrl().'?ip=185.220.101.4');
+        $page = Livewire::test(SiteHealthPage::class)->assertSee(IpPage::getUrl().'?ip=185.220.101.4');
+
+        // Ranked by what's known: the Tor list marks it in the table.
+        expect(preg_replace('/\s+/', ' ', strip_tags($page->html())))->toContain('185.220.101.4 Tor');
 
         Livewire::withQueryParams(['ip' => '185.220.101.4'])
             ->test(IpPage::class)

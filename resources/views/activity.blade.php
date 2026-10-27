@@ -30,7 +30,10 @@
                 <tbody>
                     @foreach ($activity['flagged'] as $ip)
                         <tr wire:key="flagged-{{ $ip['ip'] }}">
-                            <td class="porro-health-mono"><x-filament::link :href="$ipUrl.'?ip='.urlencode($ip['ip'])">{{ $ip['ip'] }}</x-filament::link></td>
+                            <td class="porro-health-mono">
+                                <x-filament::link :href="$ipUrl.'?ip='.urlencode($ip['ip'])">{{ $ip['ip'] }}</x-filament::link>
+                                @foreach ($ip['badges'] as $badge)<x-filament::badge :color="['danger' => 'danger', 'warning' => 'warning'][$badge['tone']] ?? 'gray'" size="sm" style="display: inline-flex; margin-left: .25rem">{{ $badge['label'] }}</x-filament::badge>@endforeach
+                            </td>
                             <td title="{{ $ip['country']['code'] ?? '' }}">{{ $ip['country']['label'] ?? '—' }}</td>
                             <td>
                                 <div class="porro-health-chips">
