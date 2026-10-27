@@ -19,7 +19,6 @@ use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\PorroPlugin;
 use Porro\Laravel\Activity\Activity;
 use Porro\Laravel\Activity\CloudflareMode;
-use Porro\Laravel\Activity\Confirm;
 
 uses(RefreshDatabase::class);
 
@@ -184,7 +183,7 @@ describe('activity on Site Health', function () {
 
         expect($html)->not->toContain('@js(')
             // The reason's ×, and how it's escaped, varies by Laravel version.
-            ->toContain("wire:click=\"blockIp('185.220.101.4', 7, '");
+            ->toContain("wire:click=\"mountAction('confirmBlock', JSON.parse('");
 
         DB::table('porro_blocklist')->insert((new Entry('103.75.190.11', 'x', Entry::MANUAL, time()))->toArray());
 
@@ -319,17 +318,30 @@ describe('IP details', function () {
             ->assertDontSee('Block permanently');
     });
 
-    it('asks before every block and safelist, and safelists in one click', function () {
+    it('asks in Filament’s own modal before every block and safelist', function () {
         $page = Livewire::withQueryParams(['ip' => '185.220.101.4'])->test(IpPage::class);
 
-        expect(substr_count($page->html(), 'wire:confirm='))->toBe(3)
-            ->and($page->html())->toContain(e(Confirm::block('185.220.101.4')))
-            ->toContain(e(Confirm::block('185.220.101.4', 7)))
-            ->toContain(e(Confirm::safelist('185.220.101.4')));
+        expect(substr_count($page->html(), 'wire:click="mountAction(\'confirm'))->toBe(3)
+            ->and(substr_count(Livewire::test(SiteHealthPage::class)->html(), 'wire:click="mountAction(\'confirm'))->toBe(3);
 
-        expect(substr_count(Livewire::test(SiteHealthPage::class)->html(), 'wire:confirm='))->toBe(3);
+        $page->mountAction('confirmBlock', ['ip' => '185.220.101.4', 'days' => 7, 'reason' => 'Flagged', 'suggested' => true])
+            ->assertActionMounted('confirmBlock');
 
-        $page->call('safelistIp', '185.220.101.4', 'From the IP details page')
+        $action = $page->instance()->getMountedAction();
+        expect($action->getModalHeading())->toBe('Block 185.220.101.4 for 7 days?')
+            ->and($action->getModalSubmitActionLabel())->toBe('Block for 7 days')
+            ->and($action->getColor())->toBe('danger');
+
+        // Nothing changes until it's confirmed.
+        expect(DB::table('porro_blocklist')->where('cidr', '185.220.101.4')->exists())->toBeFalse();
+
+        $page->callMountedAction()->assertNotified('Blocked 185.220.101.4.');
+        expect(DB::table('porro_blocklist')->where('cidr', '185.220.101.4')->exists())->toBeTrue();
+    });
+
+    it('safelists in one click once confirmed', function () {
+        Livewire::withQueryParams(['ip' => '185.220.101.4'])->test(IpPage::class)
+            ->callAction('confirmSafelist', arguments: ['ip' => '185.220.101.4', 'label' => 'From the IP details page'])
             ->assertNotified('Safelisted 185.220.101.4.')
             ->assertSee('safelisted')
             ->assertDontSee('Block permanently');
