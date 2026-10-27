@@ -415,6 +415,10 @@ describe('the full lists', function () {
         Livewire::withQueryParams(['list' => 'safelist'])->test(ListPage::class)->assertSee('Nothing is safelisted.');
     });
 
+    it('ignores a query string that isn’t plain values', function () {
+        Livewire::withQueryParams(['list' => ['x'], 'q' => ['x'], 'filter' => ['manual'], 'page' => ['2']])->test(ListPage::class)->assertSee('Page 1 of 2');
+    });
+
     it('removes from the list page, and keeps it out of the navigation', function () {
         Livewire::withQueryParams(['list' => 'blocklist'])->test(ListPage::class)
             ->call('unblockIp', '5.188.10.60')

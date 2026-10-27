@@ -29,9 +29,7 @@ class ListPage extends Page
     {
         $list = request()->query('list');
         $this->list = in_array($list, array_keys(Presenter::LISTS), true) ? $list : 'blocklist';
-        $this->search = (string) request()->query('q', '');
-        $this->filter = (string) request()->query('filter', 'all');
-        $this->pageNumber = max(1, (int) request()->query('page', 1));
+        ['search' => $this->search, 'filter' => $this->filter, 'page' => $this->pageNumber] = Presenter::listQuery(request()->query());
     }
 
     public static function getSlug(?Panel $panel = null): string
