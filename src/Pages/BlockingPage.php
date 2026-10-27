@@ -110,6 +110,8 @@ class BlockingPage extends Page
             'canManage' => static::canManage(),
             'healthUrl' => SiteHealthPage::getUrl(),
             'nginxUrl' => NginxPage::getUrl(),
+            'blocklistUrl' => ListPage::getUrl(['list' => 'blocklist']),
+            'safelistUrl' => ListPage::getUrl(['list' => 'safelist']),
         ];
     }
 }

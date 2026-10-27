@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
 use Porro\Filament\Pages\BlockingPage;
 use Porro\Filament\Pages\IpPage;
+use Porro\Filament\Pages\ListPage;
 use Porro\Filament\Pages\NginxPage;
 use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\Widgets\SiteHealthWidget;
@@ -117,7 +118,7 @@ class PorroPlugin implements Plugin
         SiteHealthPage::configure($this->navigationGroup, $this->navigationSort);
         BlockingPage::configure($this->navigationGroup, $this->navigationSort === null ? null : $this->navigationSort + 1);
 
-        $panel->pages([SiteHealthPage::class, BlockingPage::class, NginxPage::class, IpPage::class]);
+        $panel->pages([SiteHealthPage::class, BlockingPage::class, NginxPage::class, IpPage::class, ListPage::class]);
 
         if ($this->widget) {
             $panel->widgets([SiteHealthWidget::class]);

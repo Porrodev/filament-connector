@@ -82,7 +82,7 @@ php artisan porro:cloudflare connect</code></pre>
             </ul>
         </x-filament::section>
 
-        <x-filament::section :heading="__('Blocklist')" :description="trans_choice(':count entry|:count entries', count($blocks), ['count' => count($blocks)])">
+        <x-filament::section :heading="__('Blocklist')" :description="trans_choice(':count entry|:count entries', $blockCount, ['count' => number_format($blockCount)])">
             @if ($canManage)
                 <form wire:submit="addBlock" class="porro-health-form">
                     <x-filament::input.wrapper style="flex: 0 1 18rem">
@@ -102,6 +102,11 @@ php artisan porro:cloudflare connect</code></pre>
                 </form>
             @endif
             @include('porro-filament::entries', ['entries' => $blocks, 'remove' => 'unblockIp', 'empty' => __('Nothing is blocked.')])
+            @if ($blockCount > count($blocks))
+                <p class="porro-health-gap"><x-filament::link :href="$blocklistUrl">{{ __('Show all :count, with search →', ['count' => number_format($blockCount)]) }}</x-filament::link></p>
+            @elseif ($blockCount > 0)
+                <p class="porro-health-gap porro-health-small"><x-filament::link :href="$blocklistUrl" color="gray">{{ __('Search the blocklist →') }}</x-filament::link></p>
+            @endif
         </x-filament::section>
 
         <x-filament::section id="safelist" :heading="__('Safelist')" :description="__('Never blocked or flagged')">
@@ -120,6 +125,9 @@ php artisan porro:cloudflare connect</code></pre>
                 </form>
             @endif
             @include('porro-filament::entries', ['entries' => $safe, 'remove' => 'unsafelistIp', 'empty' => __('Nothing is safelisted.')])
+            @if ($safeCount > count($safe))
+                <p class="porro-health-gap"><x-filament::link :href="$safelistUrl">{{ __('Show all :count, with search →', ['count' => number_format($safeCount)]) }}</x-filament::link></p>
+            @endif
         </x-filament::section>
 
         <x-filament::section :heading="__('Always protected')" :description="__('Can’t be blocked')">

@@ -14,6 +14,7 @@ use Porro\Core\Activity\IpDetails;
 use Porro\Core\Activity\Recorder;
 use Porro\Filament\Pages\BlockingPage;
 use Porro\Filament\Pages\IpPage;
+use Porro\Filament\Pages\ListPage;
 use Porro\Filament\Pages\NginxPage;
 use Porro\Filament\Pages\SiteHealthPage;
 use Porro\Filament\PorroPlugin;
@@ -385,5 +386,41 @@ describe('IP details', function () {
         Livewire::withQueryParams(['ip' => '1.2.3'])->test(IpPage::class)->assertNotFound();
 
         expect(IpPage::shouldRegisterNavigation())->toBeFalse();
+    });
+});
+
+describe('the full lists', function () {
+    beforeEach(function () {
+        $this->actingAs(panelUser());
+        $rows = [];
+        for ($i = 1; $i <= 60; $i++) {
+            $rows[] = (new Entry("5.188.10.{$i}", $i % 2 ? 'Probing for .env' : 'Failed logins', $i % 3 ? Entry::SUGGESTED : Entry::MANUAL, 1000 + $i, $i <= 5 ? time() + 3 * 86400 : null, 'Ops'))->toArray();
+        }
+        DB::table('porro_blocklist')->insert($rows);
+    });
+
+    it('shows the newest ten on Blocking, and links to the rest', function () {
+        $html = Livewire::test(BlockingPage::class)->assertSee('Show all 60, with search')->html();
+
+        expect(substr_count($html, 'wire:click="unblockIp(\'5.188.10.'))->toBe(10);
+    });
+
+    it('searches, filters and pages the whole list', function () {
+        $first = Livewire::withQueryParams(['list' => 'blocklist'])->test(ListPage::class)->assertSee('60 entries')->assertSee('Page 1 of 2')->html();
+        expect(substr_count($first, 'wire:click="unblockIp(\'5.188.10.'))->toBe(50);
+
+        Livewire::withQueryParams(['list' => 'blocklist', 'page' => 2])->test(ListPage::class)->assertSee("unblockIp('5.188.10.1')", false);
+        Livewire::withQueryParams(['list' => 'blocklist', 'q' => '5.188.10.7'])->test(ListPage::class)->assertSee('5.188.10.7')->assertDontSee('5.188.10.8');
+        expect(substr_count(Livewire::withQueryParams(['list' => 'blocklist', 'filter' => 'expiring'])->test(ListPage::class)->html(), 'wire:click="unblockIp(\'5.188.10.'))->toBe(5);
+        Livewire::withQueryParams(['list' => 'safelist'])->test(ListPage::class)->assertSee('Nothing is safelisted.');
+    });
+
+    it('removes from the list page, and keeps it out of the navigation', function () {
+        Livewire::withQueryParams(['list' => 'blocklist'])->test(ListPage::class)
+            ->call('unblockIp', '5.188.10.60')
+            ->assertNotified('Unblocked 5.188.10.60.');
+
+        expect(DB::table('porro_blocklist')->count())->toBe(59)
+            ->and(ListPage::shouldRegisterNavigation())->toBeFalse();
     });
 });
