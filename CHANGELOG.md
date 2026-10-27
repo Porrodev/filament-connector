@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Navigation:** a **Porro** navigation group with **Site Health** and a new **Blocking** page. `navigationGroup()` still moves both; in your own group they're called "Porro Site Health" and "Porro Blocking".
+- **Suspicious activity on Site Health:** probes, failed logins, 404 bursts and form floods, with each flagged IP's rough country and buttons to block or safelist it. An exposed `/.env` or `/.git` shows as **Act now**.
+- **The Blocking page:** the blocklist, safelist and protected ranges. Blocks that would break the site are refused with the reason, shown as a notification.
+- **Permissions:** `authorizeManage()` or a `managePorroBlocklist` gate limits who can change the lists. By default it's whoever can see the pages.
+- Requires `porro/laravel-connector` 0.3. Run `php artisan migrate` for its blocklist tables.
+
 ## 0.2.1
 
 - **Access is closed by default.** When there's no `authorize()` callback, no `viewPorroSiteHealth` gate and your users have no admin marker the plugin knows, nobody sees the Site Health page or widget. 0.2.0 showed it to every panel user in that case. See "Who can see it" in the README to open it up.

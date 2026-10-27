@@ -51,7 +51,8 @@ it('adds the Site health page to the panel', function () {
     expect(Filament::getPanel('admin')->getPages())->toContain(SiteHealthPage::class)
         ->and(Filament::getPanel('admin')->getWidgets())->toContain(SiteHealthWidget::class)
         ->and(SiteHealthPage::getSlug())->toBe('site-health')
-        ->and(SiteHealthPage::getNavigationLabel())->toBe('Porro Site Health')
+        ->and(SiteHealthPage::getNavigationLabel())->toBe('Site Health')
+        ->and(SiteHealthPage::getNavigationGroup())->toBe('Porro')
         ->and(SiteHealthPage::getNavigationIcon())->toBe('porro-mark');
 });
 

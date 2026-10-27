@@ -21,5 +21,19 @@
         .porro-health-title .porro-health-muted { font-weight: 400; }
         .porro-health-aligned .porro-health-badge { min-width: 8.5rem; }
         .porro-health-compact .porro-health-badge { flex-basis: 100%; }
+        .porro-health-stats { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+        .porro-health-stat { border-radius: .5rem; background: rgb(127 127 127 / .08); padding: .75rem 1rem; }
+        .porro-health-stat-value { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+        .porro-health-table-wrap { overflow-x: auto; }
+        .porro-health-table { width: 100%; font-size: .875rem; border-collapse: collapse; }
+        .porro-health-table th { text-align: left; font-size: .75rem; font-weight: 500; text-transform: uppercase; letter-spacing: .02em; color: rgb(107 114 128); padding: 0 1rem .5rem 0; }
+        .porro-health-table td { padding: .6rem 1rem .6rem 0; border-top: 1px solid rgb(127 127 127 / .2); vertical-align: middle; }
+        .porro-health-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8125rem; white-space: nowrap; }
+        .porro-health-path { white-space: normal; overflow-wrap: anywhere; }
+        .porro-health-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+        .porro-health-actions { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; white-space: nowrap; }
+        .porro-health-form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+        .porro-health-entry { align-items: center; font-size: .875rem; }
+        .porro-health-row { justify-content: space-between; font-size: .875rem; }
     </style>
 @endonce

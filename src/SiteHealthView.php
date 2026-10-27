@@ -4,11 +4,12 @@ namespace Porro\Filament;
 
 use Carbon\Carbon;
 use Porro\Core\Health\Issue;
+use Porro\Laravel\Activity\Presenter;
 use Porro\Laravel\SiteHealth;
 use Throwable;
 
 /**
- * View data for the Site health page and widget.
+ * View data for the Site Health and Blocking pages and the widget.
  */
 class SiteHealthView
 {
@@ -18,7 +19,7 @@ class SiteHealthView
         Issue::NOTICE => ['label' => 'Notice', 'color' => 'gray'],
     ];
 
-    public function __construct(private SiteHealth $health) {}
+    public function __construct(private SiteHealth $health, private Presenter $presenter) {}
 
     /**
      * @param  int|null  $limit  how many issues to list, for the widget
@@ -51,7 +52,18 @@ class SiteHealthView
             'unavailable' => $health['unavailable'] ?? [],
             'checkedAgo' => self::ago($health['checked_at'] ?? null),
             'commands' => $health['commands'] ?? ['connect' => 'php artisan porro:connect <site key>', 'cron' => 'php artisan porro:cron'],
+            'activity' => $this->presenter->activity($health['activity'] ?? null),
         ];
+    }
+
+    /**
+     * The Blocking page.
+     *
+     * @return array<string, mixed>
+     */
+    public function blocking(): array
+    {
+        return $this->presenter->blocking();
     }
 
     private static function ago(?string $at): ?string
