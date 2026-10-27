@@ -46,6 +46,16 @@ it('names both pages after Porro in a group you pick', function () {
     BlockingPage::configure(null, null);
 });
 
+it('opens each always-protected list to show its addresses and why', function () {
+    $this->actingAs(panelUser());
+
+    Livewire::test(BlockingPage::class)
+        ->assertSee('Search engine crawlers')
+        ->assertSee('drop the site from search')
+        ->assertSee('173.245.48.0/20')
+        ->assertSee('PORRO_PROTECT_CRAWLERS=false');
+});
+
 it('lists the blocklist, safelist and protected ranges', function () {
     config(['porro.blocklist.safelist' => [['cidr' => '81.2.69.0/24', 'note' => 'Office']]]);
     DB::table('porro_blocklist')->insert((new Entry('103.75.190.0/24', 'Scanner network', Entry::MANUAL, time(), null, 'Ada'))->toArray());
@@ -256,7 +266,10 @@ describe('nginx setup', function () {
     it('shows the steps with this site’s paths, and each server', function () {
         Livewire::test(NginxPage::class)
             ->assertSee("include {$this->file};")
-            ->assertSee('No server has reported yet');
+            ->assertSeeInOrder(['1 · Turn on nginx mode', '2 · Add one line', '3 · Reload nginx'])
+            ->assertSee('data-copy="include '.$this->file.';"', false)
+            ->assertSee('add this line')
+            ->assertSee('No server has checked in yet');
 
         $this->app['env'] = 'production';
         file_put_contents($this->dir.'/sites-enabled/site', "server {\n    include {$this->file};\n}\n");
@@ -344,6 +357,12 @@ describe('IP details', function () {
             ->callAction('confirmSafelist', arguments: ['ip' => '185.220.101.4', 'label' => 'From the IP details page'])
             ->assertNotified('Safelisted 185.220.101.4.')
             ->assertSee('safelisted')
+            ->assertDontSee('Block permanently');
+    });
+
+    it('marks a protected IP and offers no way to block it', function () {
+        Livewire::withQueryParams(['ip' => '66.249.66.1'])->test(IpPage::class)
+            ->assertSee('always protected: Search engine crawlers')
             ->assertDontSee('Block permanently');
     });
 
