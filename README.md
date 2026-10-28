@@ -25,7 +25,7 @@ public function panel(Panel $panel): Panel
 }
 ```
 
-That adds a **Porro** group to the navigation with **Site Health** and **Blocking**, plus a lazy-loaded dashboard widget. Run `php artisan migrate` for the blocklist tables. No assets to publish or build.
+That adds a **Porro** group to the navigation with **Site Health** and **Blocking**, plus a lazy-loaded dashboard widget. Run `php artisan migrate` for the blocklist and activity tables. No assets to publish or build.
 
 <img src="docs/images/filament-widget.png" alt="The Porro Site Health dashboard widget" width="400">
 
@@ -80,7 +80,8 @@ Free, and on the app itself. IP addresses never leave it. The rules are the [Lar
 
 ![Site Health in a Filament panel: the suspicious activity summary and the IPs worth a look, each with Block 7 days, Block permanently and Safelist buttons](docs/images/filament-activity.png)
 
-- **What's watched:** probes for files like `/.env`, `/.git` and `wp-login.php`, failed logins on any guard (the panel's included), bursts of 404s and form floods. Counts are kept in the cache for 48 hours, and usernames only as hashes.
+- **What's watched:** probes for files like `/.env`, `/.git` and `wp-login.php`, failed logins on any guard (the panel's included), bursts of 404s and form floods. Counts are kept for 48 hours in Porro's own `porro_cache` table, so a deploy's cache clear doesn't wipe them, and usernames only as hashes.
+- **No database writes on a visitor's request:** a suspicious request appends one line to `storage/porro/activity.buf` on its server, and the lines are recorded in batches: every minute by the scheduler, now and then after a suspicious request, and whenever an activity page opens. Flags can lag by up to a minute; blocking is immediate. Where storage can't be written, or on Lambda (Vapor), each request is recorded straight away. `PORRO_ACTIVITY_BUFFER=false` turns batching off.
 - **Site Health lists the IPs worth a look,** worst first, with badges for Tor exits, Spamhaus DROP, hosting networks and research scanners, and **Block 7 days**, **Block permanently** and **Safelist** buttons. Each one asks first, in a confirmation that says what will happen and for how long.
 - **Exposed files:** if `/.env` or `/.git` ever answers, that's raised as **Act now**.
 - **IP details:** click an IP for its network, a reverse-DNS hostname checked both ways, what it did here over 48 hours, and a plain note when something claiming to be Googlebot or Bingbot isn't. With `PORRO_ABUSEIPDB_KEY`, a button checks AbuseIPDB; that's the one lookup that sends the IP anywhere, so it only runs when clicked.
