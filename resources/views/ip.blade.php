@@ -50,14 +50,65 @@
             @endforelse
         </x-filament::section>
 
-        <x-filament::section :heading="__('What it did here')" :description="__('Signals per hour · last 48 hours')">
+        <x-filament::section :heading="__('What it did here')" :description="__('Requests per hour · last 48 hours')">
             @if ($details['activity'])
+                @php($did = $details['activity'])
                 <div style="display: flex; align-items: flex-end; gap: 2px; height: 44px" aria-hidden="true">
-                    @foreach ($details['activity']['hours'] as $n)
-                        <span style="flex: 1; border-radius: 1px; height: {{ $n ? max(6, (int) round($n / $details['activity']['peak'] * 44)) : 2 }}px; background: {{ $n > 10 ? 'rgb(220 38 38)' : ($n > 0 ? 'rgb(234 128 51)' : 'rgb(127 127 127 / .2)') }}"></span>
+                    @foreach ($did['hours'] as $n)
+                        <span style="flex: 1; border-radius: 1px; height: {{ $n ? max(6, (int) round($n / $did['peak'] * 44)) : 2 }}px; background: {{ $n > 10 ? 'rgb(220 38 38)' : ($n > 0 ? 'rgb(234 128 51)' : 'rgb(127 127 127 / .2)') }}"></span>
                     @endforeach
                 </div>
                 <div class="porro-health-row porro-health-muted porro-health-small" style="display: flex; margin: .25rem 0 .75rem"><span>{{ __('48 h ago') }}</span><span>{{ __('now') }}</span></div>
+                @foreach ($did['summary'] as $label => $value)
+                    <div class="porro-health-item porro-health-entry">
+                        <span class="porro-health-muted" style="width: 8rem; flex: none">{{ __($label) }}</span>
+                        <span class="porro-health-body">{{ $value }}</span>
+                    </div>
+                @endforeach
+                @if ($did['direct'])
+                    <p class="porro-health-small porro-health-gap" style="color: rgb(217 119 6)">{{ __('Some of its requests came straight to the server’s own address, not through Cloudflare. Blocking at Cloudflare won’t stop those: block in the app or in nginx, or let only Cloudflare reach the server at its firewall.') }}</p>
+                @endif
+                @unless ($did['flagged'])
+                    <p class="porro-health-muted porro-health-small porro-health-gap">{{ __('Recorded, but under the thresholds that flag an IP. Only its suspicious requests are counted until it’s flagged.') }}</p>
+                @endunless
+            @else
+                <p>{{ __('Nothing recorded from this IP in the last 48 hours.') }}</p>
+            @endif
+        </x-filament::section>
+
+        @if ($details['activity'] && $details['activity']['paths'])
+            <x-filament::section :heading="__('Paths it asked for')" :description="__('Requests · last answer')">
+                <table class="porro-health-table">
+                    <tbody>
+                        @foreach ($details['activity']['paths'] as $p)
+                            <tr>
+                                <td class="porro-health-mono porro-health-path">{{ $p['path'] }}</td>
+                                <td class="porro-health-muted" style="width: 5rem">×{{ number_format($p['count']) }}</td>
+                                <td class="porro-health-mono" style="width: 3rem; {{ $p['status'] >= 200 && $p['status'] < 300 ? 'color: rgb(220 38 38)' : '' }}">{{ $p['status'] ?: '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @if ($details['activity']['otherPaths'])
+                    <p class="porro-health-muted porro-health-small porro-health-gap">{{ trans_choice('…and :count more request to other paths.|…and :count more requests to other paths.', $details['activity']['otherPaths'], ['count' => number_format($details['activity']['otherPaths'])]) }}</p>
+                @endif
+            </x-filament::section>
+        @endif
+
+        @if ($details['activity'] && $details['activity']['agents'])
+            <x-filament::section :heading="__('User agents')">
+                <table class="porro-health-table">
+                    <tbody>
+                        @foreach ($details['activity']['agents'] as $a)
+                            <tr><td class="porro-health-mono porro-health-path">{{ $a['agent'] }}</td><td class="porro-health-muted" style="width: 5rem">×{{ number_format($a['count']) }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </x-filament::section>
+        @endif
+
+        @if ($details['activity'] && $details['activity']['requests'])
+            <x-filament::section :heading="__('Latest requests')">
                 <table class="porro-health-table">
                     <tbody>
                         @foreach ($details['activity']['requests'] as $r)
@@ -70,10 +121,8 @@
                         @endforeach
                     </tbody>
                 </table>
-            @else
-                <p>{{ __('Nothing flagged from this IP in the last 48 hours.') }}</p>
-            @endif
-        </x-filament::section>
+            </x-filament::section>
+        @endif
 
         <x-filament::section :heading="__('Reputation')" description="AbuseIPDB">
             @if ($details['reputation'])

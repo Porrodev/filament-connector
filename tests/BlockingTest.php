@@ -3,7 +3,6 @@
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
@@ -230,7 +229,7 @@ it('shows Cloudflare WAF mode on the Blocking page', function () {
     Livewire::test(BlockingPage::class)->assertSee('Token set, not connected')->assertSee('Finish setting up');
 
     $this->app['env'] = 'production';
-    Cache::forever(CloudflareMode::STATE, [
+    Activity::store()->forever(CloudflareMode::STATE, [
         'connection' => ['zone_name' => 'dogearbooks.example'],
         'synced_at' => time() - 120,
         'result' => ['added' => 1, 'removed' => 0, 'shared' => 2],
@@ -238,7 +237,7 @@ it('shows Cloudflare WAF mode on the Blocking page', function () {
     ]);
     Livewire::test(BlockingPage::class)->assertSee('Synced 2 minutes ago')->assertSee('zone dogearbooks.example')->assertSee('2 already blocked by other sites');
 
-    Cache::forever(CloudflareMode::STATE, [
+    Activity::store()->forever(CloudflareMode::STATE, [
         'connection' => ['zone_name' => 'dogearbooks.example'],
         'error' => 'Cloudflare refused the token <b>',
     ]);
@@ -323,6 +322,23 @@ describe('IP details', function () {
             ->assertSee('Fake Googlebot')
             ->assertSee('Pretending to be Googlebot')
             ->assertSee('/backup.zip');
+    });
+
+    it('sums up what it did: requests, what it was after and how it got here', function () {
+        $recorder = app(Activity::class)->recorder();
+        $recorder->record('185.220.101.4', Recorder::PROBE, 'GET', '/containers/json', 404, category: 'infrastructure', host: 'www.example.com', proxied: false, userAgent: 'zgrab/0.x');
+        $recorder->turnedAway('185.220.101.4', 'GET', '/images/json', 'example.com', 'zgrab/0.x', true);
+
+        Livewire::withQueryParams(['ip' => '185.220.101.4'])
+            ->test(IpPage::class)
+            ->assertSee('Requests per hour')
+            ->assertSee('1 turned away by the block')
+            ->assertSee('Exposed services: Docker, MLflow, cloud metadata ×1')
+            ->assertSee('straight to the server ×1')
+            ->assertSee('Blocking at Cloudflare won’t stop those')
+            ->assertSee('Paths it asked for')
+            ->assertSee('/containers/json')
+            ->assertSee('zgrab/0.x');
     });
 
     it('blocks from the details page', function () {
@@ -480,7 +496,7 @@ describe('Cloudflare setup', function () {
             ->assertSee('Connected to dogearbooks.example');
 
         expect($this->rules)->toHaveCount(1)
-            ->and(Cache::get(CloudflareMode::STATE)['connection']['zone_name'])->toBe('dogearbooks.example');
+            ->and(Activity::store()->get(CloudflareMode::STATE)['connection']['zone_name'])->toBe('dogearbooks.example');
     });
 
     it('asks for the token before connecting', function () {
@@ -496,6 +512,6 @@ describe('Cloudflare setup', function () {
 
         Livewire::test(CloudflarePage::class)->call('connect');
 
-        expect(Cache::get(CloudflareMode::STATE)['connection'] ?? null)->toBeNull();
+        expect(Activity::store()->get(CloudflareMode::STATE)['connection'] ?? null)->toBeNull();
     });
 });
