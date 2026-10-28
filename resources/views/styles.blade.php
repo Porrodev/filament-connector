@@ -36,6 +36,7 @@
         .porro-health-entry { align-items: center; font-size: .875rem; }
         .porro-health-row { justify-content: space-between; font-size: .875rem; }
         .porro-health-copyable { display: flex; gap: .5rem; align-items: flex-start; }
+        .porro-health-callout { font-size: .875rem; padding: .75rem 1rem; border-radius: .5rem; border: 1px solid rgb(245 158 11 / .45); background: rgb(245 158 11 / .08); }
         .porro-health-copyable pre { flex: 1; min-width: 0; margin: 0; }
         .porro-health-example span { display: block; min-height: 1.5em; }
         .porro-health-example .porro-health-add { background: rgb(191 232 74 / .3); margin: 0 -.75rem; padding: 0 .75rem; font-weight: 600; }
