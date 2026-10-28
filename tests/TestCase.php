@@ -60,6 +60,9 @@ abstract class TestCase extends Orchestra
         $app['config']->set('cache.default', 'array');
         $app['config']->set('porro.url', 'https://porro.test');
 
+        // A buffer of its own per test, so no line leaks into the next.
+        $app['config']->set('porro.activity.buffer', sys_get_temp_dir().'/porro-test-'.bin2hex(random_bytes(6)).'/activity.buf');
+
         // Never touch the real crontab of whoever runs the tests.
         $app->instance(CrontabIo::class, new FakeCrontab(works: false));
     }
