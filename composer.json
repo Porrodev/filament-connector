@@ -1,6 +1,6 @@
 {
     "name": "porro/filament-connector",
-    "description": "Site health for Filament 3\u20135: security advisories, end-of-life PHP and Laravel, Filament and Laravel updates and the scheduler, on a panel page and dashboard widget. Free; connect Porro to add uptime, SSL, domain and server checks.",
+    "description": "Site health, suspicious activity and IP blocking for Filament 3\u20135, in your panel: security advisories, end-of-life PHP and Laravel, Filament and Laravel updates and the scheduler, plus probes, failed logins and form floods, blocked in the app, at Cloudflare or in nginx. Free; connect Porro to add uptime, SSL, domain and server checks.",
     "type": "library",
     "license": "MIT",
     "homepage": "https://porro.dev",
@@ -14,6 +14,9 @@
         "end of life",
         "updates",
         "monitoring",
+        "blocking",
+        "firewall",
+        "cloudflare",
         "porro"
     ],
     "require": {
