@@ -73,7 +73,7 @@ php artisan porro:cloudflare connect</code></pre>
                                 {{ trans_choice(':loaded of :count server loaded|:loaded of :count servers loaded', count($enforcement['servers']), ['loaded' => $loaded, 'count' => count($enforcement['servers'])]) }} ·
                                 <x-filament::link :href="$nginxUrl">{{ __('Setup and servers') }} →</x-filament::link>
                             @else
-                                {{ __('For sites not behind Cloudflare, or as well as it. Two one-time steps on each server.') }}
+                                {{ __('For sites not behind Cloudflare, or as well as it. Three one-time steps: one for the site, two on each server.') }}
                                 <x-filament::link :href="$nginxUrl">{{ __('Set up nginx') }} →</x-filament::link>
                             @endif
                         </p>
