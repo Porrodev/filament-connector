@@ -38,14 +38,9 @@
                             </x-filament::badge>
                         </p>
                         @if ($cloudflare['connected'])
-                            <p class="porro-health-muted">{{ __('Blocked at the edge, before traffic reaches the server · zone :zone · list porro_blocklist', ['zone' => $cloudflare['zone']]) }}@if ($cloudflare['result'] && $cloudflare['result']['shared']) · {{ trans_choice(':count already blocked by another site|:count already blocked by other sites', $cloudflare['result']['shared'], ['count' => $cloudflare['result']['shared']]) }}@endif</p>
-                        @elseif ($cloudflare['configured'])
-                            <p class="porro-health-muted">{{ __('Run this on the server to find the zone, create the porro_blocklist list and add the rule next to your existing ones:') }}</p>
-                            <pre class="porro-health-code"><code>php artisan porro:cloudflare connect</code></pre>
+                            <p class="porro-health-muted">{{ __('Blocked at the edge, before traffic reaches the server · zone :zone · list porro_blocklist', ['zone' => $cloudflare['zone']]) }}@if ($cloudflare['result'] && $cloudflare['result']['shared']) · {{ trans_choice(':count already blocked by another site|:count already blocked by other sites', $cloudflare['result']['shared'], ['count' => $cloudflare['result']['shared']]) }}@endif · <x-filament::link :href="$cloudflareUrl">{{ __('Setup') }} →</x-filament::link></p>
                         @else
-                            <p class="porro-health-muted">{{ __('Blocks at Cloudflare’s edge for sites behind it. Create a token with Account Filter Lists Edit, Zone WAF Edit and Zone Read, then:') }}</p>
-                            <pre class="porro-health-code"><code>PORRO_CLOUDFLARE_TOKEN=your-token-here
-php artisan porro:cloudflare connect</code></pre>
+                            <p class="porro-health-muted">{{ __('For sites behind Cloudflare: blocks at Cloudflare’s edge, before traffic reaches the server. Three steps, and no terminal needed.') }} <x-filament::link :href="$cloudflareUrl">{{ $cloudflare['configured'] ? __('Finish setting up') : __('Set up Cloudflare') }} →</x-filament::link></p>
                         @endif
                         @if ($cloudflare['error'])
                             <p style="color: rgb(220 38 38)">{{ $cloudflare['error'] }}</p>

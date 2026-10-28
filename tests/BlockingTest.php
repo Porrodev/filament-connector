@@ -9,10 +9,12 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Porro\Core\Activity\AbuseIpdb;
+use Porro\Core\Activity\Cloudflare;
 use Porro\Core\Activity\Entry;
 use Porro\Core\Activity\IpDetails;
 use Porro\Core\Activity\Recorder;
 use Porro\Filament\Pages\BlockingPage;
+use Porro\Filament\Pages\CloudflarePage;
 use Porro\Filament\Pages\IpPage;
 use Porro\Filament\Pages\ListPage;
 use Porro\Filament\Pages\NginxPage;
@@ -222,10 +224,10 @@ describe('activity on Site Health', function () {
 it('shows Cloudflare WAF mode on the Blocking page', function () {
     $this->actingAs(panelUser());
 
-    Livewire::test(BlockingPage::class)->assertSee('Cloudflare WAF')->assertSee('Not set up')->assertSee('PORRO_CLOUDFLARE_TOKEN=your-token-here');
+    Livewire::test(BlockingPage::class)->assertSee('Cloudflare WAF')->assertSee('Not set up')->assertSee('Set up Cloudflare')->assertDontSee('Account Filter Lists');
 
     config(['porro.blocklist.cloudflare_token' => 'token']);
-    Livewire::test(BlockingPage::class)->assertSee('Token set, not connected')->assertSee('php artisan porro:cloudflare connect');
+    Livewire::test(BlockingPage::class)->assertSee('Token set, not connected')->assertSee('Finish setting up');
 
     $this->app['env'] = 'production';
     Cache::forever(CloudflareMode::STATE, [
@@ -426,5 +428,74 @@ describe('the full lists', function () {
 
         expect(DB::table('porro_blocklist')->count())->toBe(59)
             ->and(ListPage::shouldRegisterNavigation())->toBeFalse();
+    });
+});
+
+describe('Cloudflare setup', function () {
+    beforeEach(function () {
+        $this->actingAs(panelUser());
+        $this->rules = [];
+        $this->app->instance(Cloudflare::class, new Cloudflare('token', function (string $method, string $url, array $headers, ?string $body) {
+            $path = (string) parse_url(substr($url, strlen(Cloudflare::API)), PHP_URL_PATH);
+            $ok = fn ($result) => [200, json_encode(['success' => true, 'result' => $result, 'result_info' => []])];
+
+            return match (true) {
+                $path === '/user/tokens/verify' => $ok(['status' => 'active']),
+                $path === '/zones' => $ok(str_contains($url, 'dogearbooks.example') ? [['id' => 'z1', 'name' => 'dogearbooks.example', 'account' => ['id' => 'a1']]] : []),
+                $path === '/accounts/a1/rules/lists' && $method === 'GET' => $ok([]),
+                $path === '/accounts/a1/rules/lists' => $ok(['id' => 'l1', 'name' => 'porro_blocklist', 'kind' => 'ip']),
+                $path === '/accounts/a1/rules/lists/l1/items' && $method === 'GET' => $ok([]),
+                str_starts_with($path, '/accounts/a1/rules/lists/') => $ok(['operation_id' => 'op', 'status' => 'completed']),
+                str_ends_with($path, '/entrypoint') => $this->rules ? $ok(['id' => 'rs1', 'rules' => $this->rules]) : [404, json_encode(['success' => false, 'errors' => [['message' => 'not found']]])],
+                $path === '/zones/z1/rulesets' => $ok(['id' => 'rs1', 'rules' => $this->rules = [['id' => 'r1'] + json_decode((string) $body, true)['rules'][0]]]),
+                default => [404, json_encode(['success' => false, 'errors' => [['message' => "no route {$method} {$path}"]]])],
+            };
+        }, fn () => null));
+        config(['app.url' => 'https://www.dogearbooks.example']);
+    });
+
+    it('is reached from Blocking, not the navigation', function () {
+        expect(Filament::getPanel('admin')->getPages())->toContain(CloudflarePage::class)
+            ->and(CloudflarePage::shouldRegisterNavigation())->toBeFalse();
+    });
+
+    it('walks through the token, the environment and connecting', function () {
+        Livewire::test(CloudflarePage::class)
+            ->assertSeeInOrder(['1 · Create a Cloudflare API token', '2 · Add it to the site’s environment', '3 · Connect'])
+            ->assertSee('Zone WAF Rules')
+            ->assertSee('Account Rule Lists')
+            ->assertSee('Specified Domains → www.dogearbooks.example')
+            ->assertSee('data-copy="PORRO_CLOUDFLARE_TOKEN="', false)
+            ->assertSee('One list for the whole Cloudflare account.')
+            ->assertSee('To do');
+    });
+
+    it('connects from the page and syncs', function () {
+        config(['porro.blocklist.cloudflare_token' => 'token']);
+        $this->app['env'] = 'production';
+
+        Livewire::test(CloudflarePage::class)
+            ->call('connect')
+            ->assertNotified('Connected to dogearbooks.example and synced the blocklist.')
+            ->assertSee('Connected to dogearbooks.example');
+
+        expect($this->rules)->toHaveCount(1)
+            ->and(Cache::get(CloudflareMode::STATE)['connection']['zone_name'])->toBe('dogearbooks.example');
+    });
+
+    it('asks for the token before connecting', function () {
+        Livewire::test(CloudflarePage::class)
+            ->call('connect')
+            ->assertNotified('Set PORRO_CLOUDFLARE_TOKEN first, then connect.');
+
+        expect($this->rules)->toBe([]);
+    });
+
+    it('shows what Cloudflare said when connecting fails', function () {
+        config(['porro.blocklist.cloudflare_token' => 'token', 'app.url' => 'https://elsewhere.example']);
+
+        Livewire::test(CloudflarePage::class)->call('connect');
+
+        expect(Cache::get(CloudflareMode::STATE)['connection'] ?? null)->toBeNull();
     });
 });
