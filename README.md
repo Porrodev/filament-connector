@@ -1,6 +1,6 @@
 # Porro Site Health for Filament
 
-![Porro for Filament: know it's healthy, keep bad bots out. Site health, suspicious activity and blocking in your Filament panel, free](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/hero.png)
+![Site health for Filament, free in your panel: health, activity and blocking, beside the real Porro Site Health page](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/header.png)
 
 A Porro Site Health page for Filament 3, 4 and 5 panels. It checks the app for the things that quietly go wrong between projects (security advisories in your Composer packages, PHP and Laravel versions running out of security support, Filament, Livewire and Laravel updates, a scheduler that never runs) and tells you what to do about each.
 
