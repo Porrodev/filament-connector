@@ -1,10 +1,12 @@
 # Porro Site Health for Filament
 
+![Porro for Filament: know it's healthy, keep bad bots out. Site health, suspicious activity and blocking in your Filament panel, free](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/hero.png)
+
 A Porro Site Health page for Filament 3, 4 and 5 panels. It checks the app for the things that quietly go wrong between projects (security advisories in your Composer packages, PHP and Laravel versions running out of security support, Filament, Livewire and Laravel updates, a scheduler that never runs) and tells you what to do about each.
 
 It's free and works on its own. If you use [Porro](https://porro.dev/?utm_source=filament-connector&utm_medium=readme&utm_campaign=connectors) to look after your sites, connecting it adds what can only be seen from outside: uptime, SSL certificates, domain expiry and the server's operating system.
 
-![The Porro Site Health page in a Filament panel on a site that isn't connected to Porro: a migration not run, the scheduler not running and three failed jobs, with the commands that fix them](docs/images/filament-site-health.png)
+![The Porro Site Health page in a Filament panel on a site that isn't connected to Porro: a migration not run, the scheduler not running and three failed jobs, with the commands that fix them](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-site-health.png)
 
 ## Install
 
@@ -27,7 +29,7 @@ public function panel(Panel $panel): Panel
 
 That adds a **Porro** group to the navigation with **Site Health** and **Blocking**, plus a lazy-loaded dashboard widget. Run `php artisan migrate` for the blocklist and activity tables. No assets to publish or build.
 
-<img src="docs/images/filament-widget.png" alt="The Porro Site Health dashboard widget" width="400">
+<img src="https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-widget.png" alt="The Porro Site Health dashboard widget" width="400">
 
 ### Options
 
@@ -78,7 +80,7 @@ Everyone else sees the lists but no buttons, and the server refuses their change
 
 Free, and on the app itself. IP addresses never leave it. The rules are the [Laravel connector's](https://github.com/Porrodev/laravel-connector#suspicious-activity-and-blocking), so its README has every setting.
 
-![Site Health in a Filament panel: the suspicious activity summary and the IPs worth a look, each with Block 7 days, Block permanently and Safelist buttons](docs/images/filament-activity.png)
+![Site Health in a Filament panel: the suspicious activity summary and the IPs worth a look, each with Block 7 days, Block permanently and Safelist buttons](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-activity.png)
 
 - **What's watched:** probes for files like `/.env`, `/.git` and `wp-login.php`, failed logins on any guard (the panel's included), bursts of 404s and form floods. Counts are kept for 48 hours in Porro's own `porro_cache` table, so a deploy's cache clear doesn't wipe them, and usernames only as hashes.
 - **No database writes on a visitor's request:** a suspicious request appends one line to `storage/porro/activity.buf` on its server, and the lines are recorded in batches: every minute by the scheduler, now and then after a suspicious request, and whenever an activity page opens. Flags can lag by up to a minute; blocking is immediate. Where storage can't be written, or on Lambda (Vapor), each request is recorded straight away. `PORRO_ACTIVITY_BUFFER=false` turns batching off.
@@ -86,7 +88,7 @@ Free, and on the app itself. IP addresses never leave it. The rules are the [Lar
 - **Exposed files:** if `/.env` or `/.git` ever answers, that's raised as **Act now**.
 - **IP details:** click an IP for its network, a reverse-DNS hostname checked both ways, what it did here over 48 hours, and a plain note when something claiming to be Googlebot or Bingbot isn't. With `PORRO_ABUSEIPDB_KEY`, a button checks AbuseIPDB; that's the one lookup that sends the IP anywhere, so it only runs when clicked.
 
-![IP details in a Filament panel: an address pretending to be Googlebot, caught by its hostname, with buttons to block it or its range](docs/images/filament-ip-details.png)
+![IP details in a Filament panel: an address pretending to be Googlebot, caught by its hostname, with buttons to block it or its range](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-ip-details.png)
 
 - **The Blocking page:** where blocks are enforced, the newest of the blocklist and safelist (each searchable on its own page, 50 at a time), and what's always protected.
 - **Where blocks are enforced:**
@@ -95,7 +97,7 @@ Free, and on the app itself. IP addresses never leave it. The rules are the [Lar
   - **In nginx:** `PORRO_BLOCK_NGINX=true`, then **Blocking → Set up nginx** walks through three steps with this site's real paths and shows how far each server has got.
 - **Always protected:** Cloudflare, Laravel Forge and its health checks, Google's and Bing's published crawler ranges, and private addresses can't be blocked; open each on the Blocking page to see its ranges and why. Not on Forge? `PORRO_PROTECT_FORGE=false`. Happy to block a crawler? `PORRO_PROTECT_CRAWLERS=false`. Blocks of your own IP or very wide ranges are refused too.
 
-![The Blocking page in a Filament panel: blocking in the app, at Cloudflare and in nginx, above the blocklist](docs/images/filament-blocking.png)
+![The Blocking page in a Filament panel: blocking in the app, at Cloudflare and in nginx, above the blocklist](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-blocking.png)
 
 - **Production only:** activity is recorded in production only (`PORRO_ACTIVITY=true` to record elsewhere). Blocks apply everywhere.
 - **Country:** comes from Cloudflare when the site is behind it. Otherwise it comes from [DB-IP](https://db-ip.com)'s free country file, downloaded monthly to `storage/porro`.
@@ -125,7 +127,7 @@ php artisan porro:connect <site key>
 
 The page then shows the site's open findings in Porro alongside the checks above, each linking to Porro.
 
-![Porro Site Health connected to Porro, in dark mode: an end-of-life server, an expiring certificate and domain, and a slow region, above the checks run on the site](docs/images/filament-site-health-dark.png)
+![Porro Site Health connected to Porro, in dark mode: an end-of-life server, an expiring certificate and domain, and a slow region, above the checks run on the site](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-site-health-dark.png)
 
 Connecting also sends Porro a signed report every 15 minutes on Laravel's scheduler: Filament, Livewire, plugin and package versions, each panel's id, path, whether it has a login and (from Filament 4) whether multi-factor authentication is required, plus the health facts above. Never content, users or settings values. Run `php artisan porro:status --json` to see exactly what would be sent, and see the [Laravel connector](https://github.com/Porrodev/laravel-connector) for config and commands.
 
