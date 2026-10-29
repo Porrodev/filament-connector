@@ -70,7 +70,7 @@
                     <p>{{ __('Add the site in Porro, then connect it with its site key:') }}</p>
                     <pre class="porro-health-code"><code>{{ $commands['connect'] }}</code></pre>
                     <p>
-                        <x-filament::link href="https://porro.dev" target="_blank">{{ __('Find out more at porro.dev') }}</x-filament::link>
+                        <x-filament::link href="https://porro.dev/?utm_source=filament-connector&utm_medium=control-panel&utm_campaign=connectors" target="_blank">{{ __('Find out more at porro.dev') }}</x-filament::link>
                     </p>
                 </div>
             </x-filament::section>

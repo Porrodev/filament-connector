@@ -3,7 +3,7 @@
     "description": "Site health, suspicious activity and IP blocking for Filament 3\u20135, in your panel: security advisories, end-of-life PHP and Laravel, Filament and Laravel updates and the scheduler, plus probes, failed logins and form floods, blocked in the app, at Cloudflare or in nginx. Free; connect Porro to add uptime, SSL, domain and server checks.",
     "type": "library",
     "license": "MIT",
-    "homepage": "https://porro.dev",
+    "homepage": "https://porro.dev/?utm_source=filament-connector&utm_medium=packagist&utm_campaign=connectors",
     "keywords": [
         "filament",
         "filament-plugin",

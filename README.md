@@ -2,7 +2,7 @@
 
 A Porro Site Health page for Filament 3, 4 and 5 panels. It checks the app for the things that quietly go wrong between projects (security advisories in your Composer packages, PHP and Laravel versions running out of security support, Filament, Livewire and Laravel updates, a scheduler that never runs) and tells you what to do about each.
 
-It's free and works on its own. If you use [Porro](https://porro.dev) to look after your sites, connecting it adds what can only be seen from outside: uptime, SSL certificates, domain expiry and the server's operating system.
+It's free and works on its own. If you use [Porro](https://porro.dev/?utm_source=filament-connector&utm_medium=readme&utm_campaign=connectors) to look after your sites, connecting it adds what can only be seen from outside: uptime, SSL certificates, domain expiry and the server's operating system.
 
 ![The Porro Site Health page in a Filament panel on a site that isn't connected to Porro: a migration not run, the scheduler not running and three failed jobs, with the commands that fix them](docs/images/filament-site-health.png)
 
@@ -117,7 +117,7 @@ Results are cached for five minutes, and the public data behind them for between
 
 ## Connect Porro (optional)
 
-Porro watches every site you look after from outside: uptime from several regions, SSL and domain expiry, the server's OS and security updates, with alerts by email or Slack. It's a separate service with its own account; see [porro.dev](https://porro.dev) for plans. Nothing in this package needs it, and nothing is sent to Porro until you connect. Add the site in Porro, then:
+Porro watches every site you look after from outside: uptime from several regions, SSL and domain expiry, the server's OS and security updates, with alerts by email or Slack. It's a separate service with its own account; see [porro.dev](https://porro.dev/?utm_source=filament-connector&utm_medium=readme&utm_campaign=connectors) for plans. Nothing in this package needs it, and nothing is sent to Porro until you connect. Add the site in Porro, then:
 
 ```bash
 php artisan porro:connect <site key>
