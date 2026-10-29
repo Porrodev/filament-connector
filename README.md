@@ -76,24 +76,24 @@ Everyone else sees the lists but no buttons, and the server refuses their change
 
 ## Suspicious activity and blocking
 
-Free, and on the app itself. IP addresses never leave it. The rules are the [Laravel connector's](https://github.com/Porrodev/laravel-connector#suspicious-activity-and-blocking), so its README has every setting.
+Free, and on the app itself. IP addresses aren't sent to Porro, and only leave the server in the cases listed under [Where IP addresses go](https://github.com/Porrodev/laravel-connector#where-ip-addresses-go): Cloudflare and reverse-DNS lookups on an IP's details page, the AbuseIPDB button, and blocking at Cloudflare. The rules are the [Laravel connector's](https://github.com/Porrodev/laravel-connector#suspicious-activity-and-blocking), so its README has every setting.
 
 ![Site Health in a Filament panel: the suspicious activity summary and the IPs worth a look, each with Block 7 days, Block permanently and Safelist buttons](docs/images/filament-activity.png)
 
-- **What's watched:** probes for files like `/.env`, `/.git` and `wp-login.php`, failed logins on any guard (the panel's included), bursts of 404s and form floods. Counts are kept for 48 hours in Porro's own `porro_cache` table, so a deploy's cache clear doesn't wipe them, and usernames only as hashes.
-- **No database writes on a visitor's request:** a suspicious request appends one line to `storage/porro/activity.buf` on its server, and the lines are recorded in batches: every minute by the scheduler, now and then after a suspicious request, and whenever an activity page opens. Flags can lag by up to a minute; blocking is immediate. Where storage can't be written, or on Lambda (Vapor), each request is recorded straight away. `PORRO_ACTIVITY_BUFFER=false` turns batching off.
+- **What's watched:** probes for files like `/.env`, `/.git` and `wp-login.php`, failed logins (from Laravel's `Failed` auth event, which the panel's login fires; token guards and custom guards that don't fire it aren't counted), bursts of 404s and form floods. Counts are kept for 48 hours in Porro's own `porro_cache` table, so a deploy's cache clear doesn't wipe them, and usernames only as hashes.
+- **Suspicious requests are batched:** each one appends a line to `storage/porro/activity.buf` on its server, and the lines are recorded every minute by the scheduler, now and then at the end of a suspicious request, and whenever an activity page opens. Flags can lag by up to a minute; blocking is immediate. Where storage can't be written, or on Lambda (Vapor), each request is recorded straight away. `PORRO_ACTIVITY_BUFFER=false` turns batching off.
 - **Site Health lists the IPs worth a look,** worst first, with badges for Tor exits, Spamhaus DROP, hosting networks and research scanners, and **Block 7 days**, **Block permanently** and **Safelist** buttons. Each one asks first, in a confirmation that says what will happen and for how long.
 - **Exposed files:** if `/.env` or `/.git` ever answers, that's raised as **Act now**.
-- **IP details:** click an IP for its network, a reverse-DNS hostname checked both ways, what it did here over 48 hours, and a plain note when something claiming to be Googlebot or Bingbot isn't. With `PORRO_ABUSEIPDB_KEY`, a button checks AbuseIPDB; that's the one lookup that sends the IP anywhere, so it only runs when clicked.
+- **IP details:** click an IP for its network (from Cloudflare's API when `PORRO_CLOUDFLARE_TOKEN` is set, which sends Cloudflare the IP), a reverse-DNS hostname checked both ways, what it did here over 48 hours, and a plain note when something claiming to be Googlebot or Bingbot isn't. With `PORRO_ABUSEIPDB_KEY`, a button checks AbuseIPDB; it sends the IP to AbuseIPDB, so it only runs when clicked.
 
 ![IP details in a Filament panel: an address pretending to be Googlebot, caught by its hostname, with buttons to block it or its range](docs/images/filament-ip-details.png)
 
 - **The Blocking page:** where blocks are enforced, the newest of the blocklist and safelist (each searchable on its own page, 50 at a time), and what's always protected.
 - **Where blocks are enforced:**
   - **In the app:** blocked IPs get a plain 403 before the app runs. On by default; `PORRO_BLOCK_APP=false` turns it off.
-  - **At Cloudflare's edge:** open **Blocking → Set up Cloudflare** and follow three steps. Create a token with Zone WAF Rules: Edit and Zone: Read on the site's domain, plus Account Rule Lists: Edit on the account. Set it as `PORRO_CLOUDFLARE_TOKEN`, then press Connect (or run `php artisan porro:cloudflare connect`). It adds one rule next to your existing ones, and only production syncs. The `porro_blocklist` list belongs to the whole Cloudflare account, so every site you connect on that account shares its blocks.
+  - **At Cloudflare's edge:** open **Blocking → Set up Cloudflare** and follow three steps. Create a token with Zone WAF Rules: Edit and Zone: Read on the site's domain, plus Account Rule Lists: Edit on the account. Set it as `PORRO_CLOUDFLARE_TOKEN`, then press Connect (or run `php artisan porro:cloudflare connect`). It adds one rule next to your existing ones, and only production syncs. Blocked IPs and ranges go into the account's `porro_blocklist` list with their notes. The list belongs to the whole Cloudflare account, so every site you connect on that account shares its blocks.
   - **In nginx:** `PORRO_BLOCK_NGINX=true`, then **Blocking → Set up nginx** walks through three steps with this site's real paths and shows how far each server has got.
-- **Always protected:** Cloudflare, Laravel Forge and its health checks, Google's and Bing's published crawler ranges, and private addresses can't be blocked; open each on the Blocking page to see its ranges and why. Not on Forge? `PORRO_PROTECT_FORGE=false`. Happy to block a crawler? `PORRO_PROTECT_CRAWLERS=false`. Blocks of your own IP or very wide ranges are refused too.
+- **Always protected:** Cloudflare, Laravel Forge and its health checks, Google's and Bing's published crawler ranges, and private addresses: a block that covers any of them is refused when you try to add it, and the app never turns them away. Open each on the Blocking page to see its ranges and why. Not on Forge? `PORRO_PROTECT_FORGE=false`. Happy to block a crawler? `PORRO_PROTECT_CRAWLERS=false`. Blocks of your own IP or very wide ranges are refused too.
 
 ![The Blocking page in a Filament panel: blocking in the app, at Cloudflare and in nginx, above the blocklist](docs/images/filament-blocking.png)
 
@@ -148,6 +148,12 @@ Connecting also sends Porro a signed report every 15 minutes on Laravel's schedu
 | `repo.packagist.org` | Update check, at most twice a day per package | Nothing beyond the request |
 | `endoflife.date` | Support dates, at most once a day | Nothing beyond the request |
 | `app.porro.dev` | Only once connected: reports every 15 minutes, findings when the page is open (cached 5 minutes) | Signed with the site key |
+| `www.cloudflare.com`, `forge.laravel.com` | Their published IP ranges, once a day | Nothing beyond the request |
+| `developers.google.com`, `www.bing.com` | Google's and Bing's published crawler ranges, once a day | Nothing beyond the request |
+| `check.torproject.org`, `www.spamhaus.org` | The Tor exit and Spamhaus DROP lists, when an IP's details page opens (cached an hour and a day) | Nothing beyond the request |
+| `api.cloudflare.com` | Only with `PORRO_CLOUDFLARE_TOKEN`: syncing blocks, and opening an IP's details page (cached a day per IP) | Blocked IPs and ranges with their notes, and the IP being looked at |
+| `api.abuseipdb.com` | Only with `PORRO_ABUSEIPDB_KEY`, when someone clicks the reputation button | The IP being checked |
+| `download.db-ip.com` | The free country file, once a month, where activity is recorded | Nothing beyond the request |
 
 ## Support
 
