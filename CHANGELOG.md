@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.3.6 - 2026-11-06
 
 - The README has a Scheduling reports section: how to run Laravel's scheduler on Forge, Ploi, Laravel Cloud, Vapor, Envoyer, cPanel, Plesk and plain servers, always from the `current` folder on zero-downtime deploys.
 - With `porro/laravel-connector` and `porro/php-core` 0.3.6, `php artisan porro:cron` points the cron line at the `current` folder and sends a report straight away once the site is connected.
+- Security reports go to security@porro.dev; see `SECURITY.md`.
+- CI pins every GitHub Action to a commit SHA, and Dependabot keeps Actions and Composer dependencies up to date, waiting 7 days after each release.
 
 ## 0.3.5 - 2026-10-29
 
