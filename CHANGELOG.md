@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Sign in from Porro**: with Porro's **Sign in to client sites** on, **Sign in to Filament** on the site page in Porro opens the panel signed in, without a password. Porro posts a one-time, 60-second ticket to `/porro/sign-in`; the site redeems it with Porro using its own site key and signs in the panel's user with the member's email, on the panel's own guard. It never creates users or changes roles, and only signs in users `canAccessPanel()` lets in. It uses the default panel, or the one `PORRO_SIGN_IN_PANEL` names. `PORRO_SIGN_IN=false` turns it off on the site.
+
 ## 0.3.6 - 2026-11-06
 
 - The README has a Scheduling reports section: how to run Laravel's scheduler on Forge, Ploi, Laravel Cloud, Vapor, Envoyer, cPanel, Plesk and plain servers, always from the `current` folder on zero-downtime deploys.
