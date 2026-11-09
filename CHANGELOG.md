@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Sign in from Porro**: with Porro's **Sign in to client sites** on, **Sign in to Filament** on the site page in Porro opens the panel signed in, without a password. Porro posts a one-time, 60-second ticket to `/porro/sign-in`; the site redeems it with Porro using its own site key and signs in the panel's user with the member's email, on the panel's own guard. It never creates users or changes roles, and only signs in users `canAccessPanel()` lets in. It uses the default panel, or the one `PORRO_SIGN_IN_PANEL` names. `PORRO_SIGN_IN=false` turns it off on the site.
+- **Sign in from Porro**: with Porro's **Sign in to client sites** on, **Sign in to Filament** on the site page in Porro opens the panel signed in, without a password. Porro posts a one-time, 60-second ticket to `/porro/sign-in`; the site redeems it with Porro using its own site key and signs in the panel's user with the member's email, on the panel's own guard. It never creates users or changes roles, and only signs in users `canAccessPanel()` lets in. It uses the default panel, or the one `PORRO_SIGN_IN_PANEL` names. `PORRO_SIGN_IN=false` turns it off on the site. More than one account with the email, in any case, signs no one in, and if someone else is already signed in it asks before switching accounts.
 
 ## 0.3.6 - 2026-11-06
 

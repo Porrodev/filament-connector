@@ -1,5 +1,6 @@
-{{-- Shown when signing in from Porro doesn't work. A plain page of its own:
-     no panel scripts or styles, as the visitor isn't signed in. --}}
+{{-- Shown when signing in from Porro doesn't work, or needs a yes first
+     because someone else is signed in. A plain page of its own: no panel
+     scripts or styles, as the visitor may not be signed in. --}}
 @php
     $messages = [
         'expired' => [
@@ -9,6 +10,14 @@
         'no_account' => [
             'title' => __('No account for you here'),
             'body' => __('This site has no Filament user with the email :email. Ask whoever manages the site to add you, then choose Sign in again in Porro.', ['email' => $email]),
+        ],
+        'ambiguous' => [
+            'title' => __('More than one account uses this email'),
+            'body' => __('More than one account on this site uses this email, so Porro can’t tell which to sign in. Ask a site admin to fix it.'),
+        ],
+        'switch' => [
+            'title' => __('Switch accounts?'),
+            'body' => __('You’re signed in as :current. Switch to :email?', ['current' => $current ?? '', 'email' => $email]),
         ],
         'no_panel_access' => [
             'title' => __('Your account can’t use the panel'),
@@ -59,13 +68,23 @@
         p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
         a { color: var(--link); }
         .actions { margin-top: 20px; font-size: 15px; }
+        form.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+        button { font: inherit; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 0; background: var(--link); color: var(--card); cursor: pointer; }
     </style>
 </head>
 <body>
     <main>
         <h1>{{ $message['title'] }}</h1>
         <p>{{ $message['body'] }}</p>
-        @if ($login)
+        @if ($reason === 'switch')
+            {{-- Same-origin now, so this post carries the CSRF token. --}}
+            <form class="actions" method="post" action="{{ route('porro.sign-in.confirm') }}">
+                @csrf
+                <input type="hidden" name="token" value="{{ $token }}">
+                <button type="submit">{{ __('Switch to :email', ['email' => $email]) }}</button>
+                <a href="{{ $stay }}">{{ __('Stay signed in as :current', ['current' => $current]) }}</a>
+            </form>
+        @elseif ($login)
             <p class="actions"><a href="{{ $login }}">{{ __('Sign in with a password') }}</a></p>
         @endif
     </main>

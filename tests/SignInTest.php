@@ -11,6 +11,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -90,15 +91,22 @@ it('matches the email whatever its case', function (string $fromPorro, string $h
     'an underscore' => ['Daniel_Jones@1994.co.uk', 'daniel_jones@1994.co.uk'],
 ]);
 
-it('signs no one in when two accounts differ only in case', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'DANIEL@1994.co.uk', 'name' => 'Daniel Jones']);
-    member('Daniel@1994.co.uk');
-    member('daniel@1994.CO.UK');
+it('signs no one in when more than one account uses the email, whatever its case', function (array $here) {
+    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    foreach ($here as $email) {
+        member($email);
+    }
 
-    $this->post(signInUrl(), ['ticket' => TICKET])->assertForbidden()->assertSee('No account for you here');
+    $this->post(signInUrl(), ['ticket' => TICKET])
+        ->assertForbidden()
+        ->assertSee('More than one account on this site uses this email, so Porro can’t tell which to sign in. Ask a site admin to fix it.', false);
 
     expect(Auth::check())->toBeFalse();
-});
+})->with([
+    // An exact match doesn't win over one that differs only in case.
+    'one exact, one not' => [['daniel@1994.co.uk', 'Daniel@1994.co.uk']],
+    'neither exact' => [['Daniel@1994.co.uk', 'daniel@1994.CO.UK']],
+]);
 
 it('redeems the ticket with a request signed by the site key', function () {
     porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
@@ -322,6 +330,109 @@ it('isn’t turned away for a missing CSRF token outside tests', function () {
     $user = member();
     // Laravel skips CSRF checks while running tests; pretend it's live.
     $this->app['env'] = 'production';
+
+    $this->post(signInUrl(), ['ticket' => TICKET])->assertRedirect(Filament::getPanel('admin')->getUrl());
+
+    expect(Auth::id())->toBe($user->id);
+});
+
+/**
+ * The token in the "switch accounts?" page's form.
+ */
+function switchToken(string $html): string
+{
+    preg_match('/name="token" value="([^"]+)"/', $html, $m);
+
+    return html_entity_decode($m[1] ?? '');
+}
+
+it('asks before switching when someone else is signed in, and switches only on the yes', function () {
+    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    $current = member('ada@example.com');
+    $user = member();
+    $this->actingAs($current);
+
+    $page = $this->post(signInUrl(), ['ticket' => TICKET])
+        ->assertOk()
+        ->assertSee('You’re signed in as ada@example.com. Switch to daniel@1994.co.uk?', false)
+        ->assertSee(route('porro.sign-in.confirm'))
+        ->assertDontSee(TICKET)
+        ->assertHeader('Cache-Control', 'no-store, private');
+
+    // The ticket is spent, but nobody has been swapped yet.
+    Http::assertSentCount(1);
+    expect(Auth::id())->toBe($current->id);
+
+    $this->post(route('porro.sign-in.confirm'), ['token' => switchToken($page->getContent())])
+        ->assertRedirect(Filament::getPanel('admin')->getUrl());
+
+    expect(Auth::id())->toBe($user->id);
+});
+
+it('takes the switch once only', function () {
+    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    $current = member('ada@example.com');
+    member();
+    $this->actingAs($current);
+    $token = switchToken($this->post(signInUrl(), ['ticket' => TICKET])->getContent());
+
+    $this->post(route('porro.sign-in.confirm'), ['token' => $token])->assertRedirect();
+    $this->actingAs($current);
+
+    $this->post(route('porro.sign-in.confirm'), ['token' => $token])->assertStatus(410);
+    expect(Auth::id())->toBe($current->id);
+});
+
+it('lets the switch lapse after five minutes', function () {
+    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    $current = member('ada@example.com');
+    member();
+    $this->actingAs($current);
+    $token = switchToken($this->post(signInUrl(), ['ticket' => TICKET])->getContent());
+
+    $this->travel(301)->seconds();
+
+    $this->post(route('porro.sign-in.confirm'), ['token' => $token])->assertStatus(410);
+    expect(Auth::id())->toBe($current->id);
+});
+
+it('won’t switch for a token shown to someone else, or one it didn’t make', function () {
+    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    $current = member('ada@example.com');
+    $other = member('bea@example.com');
+    $user = member();
+    $this->actingAs($current);
+    $token = switchToken($this->post(signInUrl(), ['ticket' => TICKET])->getContent());
+
+    // Made for a session signed in as someone else.
+    $this->actingAs($other);
+    $this->post(route('porro.sign-in.confirm'), ['token' => $token])->assertStatus(410);
+
+    // Not made here at all.
+    $forged = Crypt::encrypt(['panel' => 'admin', 'from' => $other->id, 'to' => $user->id, 'nonce' => 'made-up', 'expires' => time() + 300]);
+    $this->post(route('porro.sign-in.confirm'), ['token' => $forged])->assertStatus(410);
+    $this->post(route('porro.sign-in.confirm'), ['token' => 'not-encrypted'])->assertStatus(410);
+
+    expect(Auth::id())->toBe($other->id);
+});
+
+it('checks CSRF on the switch, as it’s posted from this site', function () {
+    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    $current = member('ada@example.com');
+    member();
+    $this->actingAs($current);
+    $token = switchToken($this->post(signInUrl(), ['ticket' => TICKET])->getContent());
+    $this->app['env'] = 'production';
+
+    $this->post(route('porro.sign-in.confirm'), ['token' => $token])->assertStatus(419);
+
+    expect(Auth::id())->toBe($current->id);
+});
+
+it('just opens the panel when the member is already signed in as themselves', function () {
+    porroAnswers(200, ['ok' => true, 'email' => 'Daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    $user = member();
+    $this->actingAs($user);
 
     $this->post(signInUrl(), ['ticket' => TICKET])->assertRedirect(Filament::getPanel('admin')->getUrl());
 

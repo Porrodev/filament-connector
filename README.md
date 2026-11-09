@@ -143,6 +143,8 @@ Once the site is connected, Porro members can open the site's Filament panel fro
 
 It only signs in users who already exist here and can use the panel: `canAccessPanel()` decides, as it does for Filament's own login (a user model without `FilamentUser` only gets in on a local app, as with Filament). It never creates accounts or changes roles: a member without an account gets a page saying so. A used or expired link, sign-in turned off, or Porro being unreachable each get a plain page explaining what to do. The route takes 10 tries a minute from one IP.
 
+If more than one account here uses the email (in different case), it signs no one in and says so. If someone else is already signed in to the panel in that browser, it asks before switching accounts, with a button that works once within 5 minutes; if it's the same person, it just opens the panel.
+
 It signs in to the default panel. To use another, give its id:
 
 ```env

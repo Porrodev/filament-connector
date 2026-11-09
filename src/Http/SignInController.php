@@ -9,11 +9,15 @@ use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Auth\UserProvider;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Porro\Core\SiteKey;
 use Porro\Filament\SignIn;
@@ -28,6 +32,10 @@ use Throwable;
  */
 class SignInController extends Controller
 {
+    private const SWITCH_CACHE = 'porro:sign-in-switch:';
+
+    private const SWITCH_SECONDS = 300;
+
     public function __invoke(Request $request, SignIn $signIn): Response|RedirectResponse
     {
         // The site owner's switch comes first, and Porro is never asked.
@@ -68,6 +76,54 @@ class SignInController extends Controller
         };
     }
 
+    /**
+     * The second step when someone else was already signed in: the
+     * confirmation page's own form, same-origin and CSRF-checked, carrying
+     * the token that names who to switch to.
+     */
+    public function confirm(Request $request): Response|RedirectResponse
+    {
+        if (! SignIn::enabled()) {
+            return $this->page('turned_off_here', 403);
+        }
+
+        try {
+            $switch = Crypt::decrypt((string) $request->input('token'));
+        } catch (DecryptException) {
+            return $this->page('expired', 410, panel: $this->panel());
+        }
+
+        $panel = is_array($switch) ? (Filament::getPanels()[(string) ($switch['panel'] ?? '')] ?? null) : null;
+
+        // Five minutes, once, and only from the session it was shown to:
+        // the user signed in then must still be the one signed in now.
+        if ($panel === null
+            || ! is_int($switch['expires'] ?? null) || $switch['expires'] < time()
+            || ! is_string($switch['nonce'] ?? null)
+            || ! Cache::pull(self::SWITCH_CACHE.$switch['nonce'])) {
+            return $this->page('expired', 410, panel: $panel);
+        }
+
+        $guard = Auth::guard($panel->getAuthGuard());
+
+        if (! $guard instanceof StatefulGuard || (string) $guard->id() !== (string) ($switch['from'] ?? '')) {
+            return $this->page('expired', 410, panel: $panel);
+        }
+
+        $user = $this->provider($guard, $panel)?->retrieveById($switch['to'] ?? null);
+
+        if ($user === null) {
+            return $this->page('expired', 410, panel: $panel);
+        }
+
+        // Access is checked again: it may have changed in five minutes.
+        if (! $this->canUse($user, $panel)) {
+            return $this->page('no_panel_access', 403, $this->email($user), $panel);
+        }
+
+        return $this->logIn($request, $guard, $user, $panel);
+    }
+
     private function signIn(Request $request, Panel $panel, string $email): Response|RedirectResponse
     {
         $guard = Auth::guard($panel->getAuthGuard());
@@ -76,24 +132,55 @@ class SignInController extends Controller
             return $this->page('no_panel', 403, panel: $panel);
         }
 
-        $user = $this->findUser($this->provider($guard, $panel), $email);
+        $users = $this->findUsers($this->provider($guard, $panel), $email);
 
-        if ($user === null) {
+        if ($users === []) {
             return $this->page('no_account', 403, $email, $panel);
         }
 
-        // The rule Filament's own Authenticate middleware applies: the
-        // user's canAccessPanel(), or, for a user model that doesn't
-        // implement FilamentUser, only a local app. Checked before logging
-        // in, so a refused member isn't left signed in on the guard.
-        $allowed = $user instanceof FilamentUser
-            ? $user->canAccessPanel($panel)
-            : config('app.env') === 'local';
+        // Two accounts with the same email in different case would make the
+        // answer a guess, so that signs no one in.
+        if (count($users) > 1) {
+            return $this->page('ambiguous', 403, $email, $panel);
+        }
 
-        if (! $allowed) {
+        $user = $users[0];
+
+        if (! $this->canUse($user, $panel)) {
             return $this->page('no_panel_access', 403, $email, $panel);
         }
 
+        $current = $guard->user();
+
+        if ($current !== null) {
+            if ((string) $current->getAuthIdentifier() === (string) $user->getAuthIdentifier()) {
+                return redirect()->to($this->home($panel));
+            }
+
+            // Someone else is signed in here. A ticket posted from another
+            // site could otherwise swap this browser into a different
+            // account without its owner noticing, so they're asked first.
+            return $this->switchPage($panel, $current, $user);
+        }
+
+        return $this->logIn($request, $guard, $user, $panel);
+    }
+
+    /**
+     * The rule Filament's own Authenticate middleware applies: the user's
+     * canAccessPanel(), or, for a user model that doesn't implement
+     * FilamentUser, only a local app. Checked before logging in, so a
+     * refused member isn't left signed in on the guard.
+     */
+    private function canUse(Authenticatable $user, Panel $panel): bool
+    {
+        return $user instanceof FilamentUser
+            ? $user->canAccessPanel($panel)
+            : config('app.env') === 'local';
+    }
+
+    private function logIn(Request $request, StatefulGuard $guard, Authenticatable $user, Panel $panel): RedirectResponse
+    {
         $guard->login($user);
 
         // A fresh session id and CSRF token, so nothing from before the
@@ -102,7 +189,32 @@ class SignInController extends Controller
         $request->session()->regenerate();
         $request->session()->regenerateToken();
 
-        return redirect()->to($panel->getUrl() ?? url($panel->getPath()));
+        return redirect()->to($this->home($panel));
+    }
+
+    private function home(Panel $panel): string
+    {
+        return $panel->getUrl() ?? url($panel->getPath());
+    }
+
+    private function switchPage(Panel $panel, Authenticatable $current, Authenticatable $user): Response
+    {
+        $nonce = Str::random(40);
+        Cache::put(self::SWITCH_CACHE.$nonce, true, self::SWITCH_SECONDS);
+
+        $token = Crypt::encrypt([
+            'panel' => $panel->getId(),
+            'from' => $current->getAuthIdentifier(),
+            'to' => $user->getAuthIdentifier(),
+            'nonce' => $nonce,
+            'expires' => time() + self::SWITCH_SECONDS,
+        ]);
+
+        return $this->page('switch', 200, $this->email($user), $panel, [
+            'current' => $this->email($current),
+            'token' => $token,
+            'stay' => $this->home($panel),
+        ]);
     }
 
     /**
@@ -130,48 +242,55 @@ class SignInController extends Controller
     }
 
     /**
-     * Porro's email may differ in case from the one on the account here, and
-     * whether the database minds depends on the database: MySQL doesn't,
-     * Postgres and SQLite do.
+     * Every user whose email matches, whatever its case. Porro's may differ
+     * in case from the one here, and whether the database minds depends on
+     * the database: MySQL doesn't, Postgres and SQLite do. So the query
+     * compares lower case on every one, and more than one match is
+     * reported, never resolved.
+     *
+     * @return list<Authenticatable>
      */
-    private function findUser(?UserProvider $provider, string $email): ?Authenticatable
+    private function findUsers(?UserProvider $provider, string $email): array
     {
-        if ($provider === null) {
-            return null;
+        if ($provider instanceof EloquentUserProvider) {
+            return $provider->createModel()->newQuery()
+                ->whereRaw('lower(email) = ?', [strtolower($email)])
+                ->limit(2)
+                ->get()
+                ->filter(fn ($user) => $user instanceof Authenticatable && $this->emailMatches($user, $email))
+                ->values()
+                ->all();
         }
 
+        // Other providers can't be asked for every match, only for one.
         foreach (array_unique([$email, strtolower($email)]) as $candidate) {
-            $user = $provider->retrieveByCredentials(['email' => $candidate]);
+            $user = $provider?->retrieveByCredentials(['email' => $candidate]);
 
             // The provider's own query decides what matched; this settles it.
             if ($user !== null && $this->emailMatches($user, $email)) {
-                return $user;
+                return [$user];
             }
         }
 
-        if (! $provider instanceof EloquentUserProvider) {
-            return null;
-        }
-
-        // Neither spelling matched exactly. Two accounts that differ only in
-        // case would make the answer a guess, so that signs no one in.
-        $users = $provider->createModel()->newQuery()
-            ->whereRaw('lower(email) = ?', [strtolower($email)])
-            ->limit(2)
-            ->get()
-            ->filter(fn ($user) => $user instanceof Authenticatable && $this->emailMatches($user, $email));
-
-        return $users->count() === 1 ? $users->first() : null;
+        return [];
     }
 
     private function emailMatches(Authenticatable $user, string $email): bool
     {
-        $theirs = data_get($user, 'email');
-
-        return is_string($theirs) && strcasecmp(trim($theirs), $email) === 0;
+        return strcasecmp(trim($this->email($user)), $email) === 0;
     }
 
-    private function page(string $reason, int $status, ?string $email = null, ?Panel $panel = null): Response
+    private function email(Authenticatable $user): string
+    {
+        $email = data_get($user, 'email');
+
+        return is_string($email) ? $email : '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
+    private function page(string $reason, int $status, ?string $email = null, ?Panel $panel = null, array $extra = []): Response
     {
         $login = null;
 
@@ -182,7 +301,7 @@ class SignInController extends Controller
         }
 
         return response()
-            ->view('porro-filament::sign-in', ['reason' => $reason, 'email' => $email, 'login' => $login], $status)
+            ->view('porro-filament::sign-in', ['reason' => $reason, 'email' => $email, 'login' => $login, ...$extra], $status)
             // A sign-in answer is for this visitor once, never for a cache.
             ->header('Cache-Control', 'no-store, private')
             ->header('Referrer-Policy', 'no-referrer');

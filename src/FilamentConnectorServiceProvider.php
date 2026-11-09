@@ -49,6 +49,13 @@ class FilamentConnectorServiceProvider extends ServiceProvider
                 ->middleware('throttle:porro-sign-in')
                 ->withoutMiddleware([PreventRequestForgery::class, ValidateCsrfToken::class, VerifyCsrfToken::class])
                 ->name('porro.sign-in');
+
+            // The yes from the "switch accounts?" page. That page is on
+            // this site, so unlike the first post this one keeps CSRF.
+            Route::middleware('web')
+                ->post('porro/sign-in/confirm', [SignInController::class, 'confirm'])
+                ->middleware('throttle:porro-sign-in')
+                ->name('porro.sign-in.confirm');
         }
     }
 }
