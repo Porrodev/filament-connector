@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Filament 3 sites on Laravel 10 can install the connector, with `porro/laravel-connector` 0.3.8 or later. CI now tests Laravel 10 too.
+
 ## 0.3.6 - 2026-11-06
 
 - The README has a Scheduling reports section: how to run Laravel's scheduler on Forge, Ploi, Laravel Cloud, Vapor, Envoyer, cPanel, Plesk and plain servers, always from the `current` folder on zero-downtime deploys.

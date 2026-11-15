@@ -14,11 +14,14 @@ jobs:
     with:
       quality-php: '8.4'
       extensions: sodium, pdo_sqlite, intl
-      # Laravel 11 is past security support, so Composer blocks it by default
-      # ("insecure"). The connector still supports it: those are the sites
-      # Porro flags.
+      # Laravel 10 and 11 are past security support, so Composer blocks them
+      # by default ("insecure"). The connector still supports them: those are
+      # the sites Porro flags. Laravel 10's testbench needs Pest 2, and
+      # Filament 4 and 5 need Laravel 11 or later.
       matrix: |
         [
+          {"php": "8.2", "require": "laravel/framework:10.* orchestra/testbench:8.* filament/filament:3.* pestphp/pest:2.*", "insecure": true},
+          {"php": "8.4", "require": "laravel/framework:10.* orchestra/testbench:8.* filament/filament:3.* pestphp/pest:2.*", "insecure": true},
           {"php": "8.2", "require": "laravel/framework:11.* orchestra/testbench:9.* filament/filament:3.*", "insecure": true},
           {"php": "8.2", "require": "laravel/framework:11.* orchestra/testbench:9.* filament/filament:4.*", "insecure": true},
           {"php": "8.2", "require": "laravel/framework:11.* orchestra/testbench:9.* filament/filament:5.*", "insecure": true},

@@ -213,7 +213,7 @@ Use the `current` path on zero-downtime deploys.
 
 ## Requirements
 
-- Filament 3.2, 4 or 5, Laravel 11–13, PHP 8.2+
+- Filament 3.2, 4 or 5, Laravel 10–13 (Laravel 10 with Filament 3), PHP 8.2+
 - Outbound HTTPS to `packagist.org`, `repo.packagist.org` and `endoflife.date` (and `app.porro.dev` once connected). Without it, the checks that need them say so and the rest still run.
 
 ## Demo
