@@ -138,12 +138,13 @@ Connecting also sends Porro a signed report every 15 minutes on Laravel's schedu
 Once the site is connected, Porro members can open the site's Filament panel from its page in Porro with **Sign in to Filament**, without a password. It needs **Sign in to client sites** turned on for the workspace in Porro.
 
 1. Porro sends the member's browser to `POST /porro/sign-in` with a one-time ticket that lasts 60 seconds.
-2. The site checks the ticket with Porro, server to server, signed with its own site key, and Porro answers with the member's email.
-3. The site finds the user with that email (in any case) through the panel's auth guard, signs them in on that guard and opens the panel.
+2. That first step starts no session and signs no one in. Its page posts the ticket on to `/porro/sign-in/continue` from the site itself, so the browser sends the session cookie it holds back from another site's post, and the site can see who's already signed in.
+3. The site checks the ticket with Porro, server to server, signed with its own site key, and Porro answers with the member's email.
+4. The site finds the user with that email (in any case) through the panel's auth guard, signs them in on that guard and opens the panel.
 
-It only signs in users who already exist here and can use the panel: `canAccessPanel()` decides, as it does for Filament's own login (a user model without `FilamentUser` only gets in on a local app, as with Filament). It never creates accounts or changes roles: a member without an account gets a page saying so. A used or expired link, sign-in turned off, or Porro being unreachable each get a plain page explaining what to do. The route takes 10 tries a minute from one IP.
+It only signs in users who already exist here and can use the panel: `canAccessPanel()` decides, as it does for Filament's own login (a user model without `FilamentUser` only gets in on a local app, as with Filament). It never creates accounts or changes roles: a member without an account gets a page saying so. A used or expired link, sign-in turned off, or Porro being unreachable each get a plain page explaining what to do. Each step takes 10 tries a minute from one IP, the ticket is only read from the form, never the address, and none of its pages can be shown in another site's frame.
 
-If more than one account here uses the email (in different case), it signs no one in and says so. If someone else is already signed in to the panel in that browser, it asks before switching accounts, with a button that works once within 5 minutes; if it's the same person, it just opens the panel.
+If more than one account here uses the email (in different case), it signs no one in and says so. The panel's users must be Eloquent models: with any other user provider it can't rule out a second account with the email, so it signs no one in. If someone else is already signed in to the panel in that browser, it asks before switching accounts, with a button that works once within 5 minutes; if it's the same person, it just opens the panel.
 
 It signs in to the default panel. To use another, give its id:
 
@@ -153,9 +154,10 @@ PORRO_SIGN_IN_PANEL=admin
 
 Signing in from Porro skips the panel's own multi-factor challenge (Filament 4 and 5's app and email authentication), as Porro has already signed the member in. A panel that requires multi-factor authentication still sends a user who hasn't set it up to set it up, and email verification and the panel's other middleware still apply.
 
-To turn it off on this site, whatever Porro says:
+It's on for the live site (`APP_ENV=production`) and off on staging and local copies, which often carry the live site's key. To turn it on for a copy, or off on the live site whatever Porro says:
 
 ```env
+PORRO_SIGN_IN=true
 PORRO_SIGN_IN=false
 ```
 

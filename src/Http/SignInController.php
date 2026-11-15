@@ -25,8 +25,9 @@ use Throwable;
 
 /**
  * "Sign in to Filament" from the site page in Porro. Porro's page posts a
- * one-time ticket here; the site checks it with Porro using its own key and
- * signs in the panel's user with the member's email. No password changes
+ * one-time ticket here, this site's own page posts it on, and then the
+ * site checks it with Porro using its own key and signs in the panel's
+ * user with the member's email. No password changes
  * hands, no account is ever made and no role is ever changed: a member
  * without an account here gets a page saying so.
  */
@@ -36,11 +37,43 @@ class SignInController extends Controller
 
     private const SWITCH_SECONDS = 300;
 
+    /**
+     * Where Porro's page posts the ticket, from another site. Browsers hold
+     * the session cookie back from a post like that, so nobody would look
+     * signed in here, and starting a session would replace the one they
+     * have. So this step has no session and signs no one in: it answers
+     * with a page that posts the ticket on, from this site, to the step
+     * that can see who's signed in.
+     */
+    public function start(Request $request): Response
+    {
+        if (! SignIn::enabled()) {
+            return $this->page(SignIn::offReason(), 403);
+        }
+
+        $ticket = $this->ticket($request);
+
+        // Only from Porro's own page. Any other site could post a ticket
+        // of its own here and have this page sign a visitor in to its
+        // account.
+        if ($ticket === null || ! $this->sameOrigin((string) $request->headers->get('Origin'), (string) config('porro.url'))) {
+            return $this->page('expired', 410);
+        }
+
+        return $this->page('continue', 200, extra: ['ticket' => $ticket]);
+    }
+
     public function __invoke(Request $request, SignIn $signIn): Response|RedirectResponse
     {
         // The site owner's switch comes first, and Porro is never asked.
         if (! SignIn::enabled()) {
-            return $this->page('turned_off_here', 403);
+            return $this->page(SignIn::offReason(), 403);
+        }
+
+        // Only from the page above. Posted from anywhere else, the session
+        // cookie may be missing, and the check on who's signed in with it.
+        if (! $this->fromThisSite($request)) {
+            return $this->page('expired', 410);
         }
 
         try {
@@ -57,11 +90,9 @@ class SignInController extends Controller
             return $this->page('no_panel', 403);
         }
 
-        // Only the shape Porro makes. Anything else can't be a live ticket,
-        // so it isn't worth a request to Porro.
-        $ticket = $request->input('ticket');
+        $ticket = $this->ticket($request);
 
-        if (! is_string($ticket) || ! preg_match('/^[A-Za-z0-9_.~:-]{16,512}$/', $ticket)) {
+        if ($ticket === null) {
             return $this->page('expired', 410, panel: $panel);
         }
 
@@ -84,7 +115,7 @@ class SignInController extends Controller
     public function confirm(Request $request): Response|RedirectResponse
     {
         if (! SignIn::enabled()) {
-            return $this->page('turned_off_here', 403);
+            return $this->page(SignIn::offReason(), 403);
         }
 
         try {
@@ -133,6 +164,13 @@ class SignInController extends Controller
         }
 
         $users = $this->findUsers($this->provider($guard, $panel), $email);
+
+        // Users kept somewhere that can only be asked for one match: no
+        // way to be sure the email is one account's alone, so no one is
+        // signed in.
+        if ($users === null) {
+            return $this->page('no_lookup', 403, panel: $panel);
+        }
 
         if ($users === []) {
             return $this->page('no_account', 403, $email, $panel);
@@ -246,33 +284,76 @@ class SignInController extends Controller
      * in case from the one here, and whether the database minds depends on
      * the database: MySQL doesn't, Postgres and SQLite do. So the query
      * compares lower case on every one, and more than one match is
-     * reported, never resolved.
+     * reported, never resolved. Null when the users aren't Eloquent
+     * models: other providers can only be asked for one match, which
+     * can't show the email is one account's alone.
      *
-     * @return list<Authenticatable>
+     * @return list<Authenticatable>|null
      */
-    private function findUsers(?UserProvider $provider, string $email): array
+    private function findUsers(?UserProvider $provider, string $email): ?array
     {
-        if ($provider instanceof EloquentUserProvider) {
-            return $provider->createModel()->newQuery()
-                ->whereRaw('lower(email) = ?', [strtolower($email)])
-                ->limit(2)
-                ->get()
-                ->filter(fn ($user) => $user instanceof Authenticatable && $this->emailMatches($user, $email))
-                ->values()
-                ->all();
+        if (! $provider instanceof EloquentUserProvider) {
+            return null;
         }
 
-        // Other providers can't be asked for every match, only for one.
-        foreach (array_unique([$email, strtolower($email)]) as $candidate) {
-            $user = $provider?->retrieveByCredentials(['email' => $candidate]);
+        return $provider->createModel()->newQuery()
+            ->whereRaw('lower(email) = ?', [strtolower($email)])
+            ->limit(2)
+            ->get()
+            ->filter(fn ($user) => $user instanceof Authenticatable && $this->emailMatches($user, $email))
+            ->values()
+            ->all();
+    }
 
-            // The provider's own query decides what matched; this settles it.
-            if ($user !== null && $this->emailMatches($user, $email)) {
-                return [$user];
+    /**
+     * The ticket from the form body, never the address: a ticket in a URL
+     * ends up in logs and history. Only the shape Porro makes; anything
+     * else can't be a live ticket, so it isn't worth a request to Porro.
+     */
+    private function ticket(Request $request): ?string
+    {
+        $ticket = $request->request->all()['ticket'] ?? null;
+
+        if ($request->query->has('ticket') || ! is_string($ticket) || ! preg_match('/^[A-Za-z0-9_.~:-]{16,512}$/', $ticket)) {
+            return null;
+        }
+
+        return $ticket;
+    }
+
+    /**
+     * Whether this site's own page made the request. Browsers say so in
+     * Sec-Fetch-Site; older ones name the page's origin, which must be
+     * this site's, scheme and port included.
+     */
+    private function fromThisSite(Request $request): bool
+    {
+        $site = $request->headers->get('Sec-Fetch-Site');
+
+        if ($site !== null) {
+            return $site === 'same-origin';
+        }
+
+        return $this->sameOrigin((string) $request->headers->get('Origin'), $request->getSchemeAndHttpHost());
+    }
+
+    /**
+     * Whether two addresses share a scheme, host and port.
+     */
+    private function sameOrigin(string $one, string $other): bool
+    {
+        $origin = function (string $url): ?string {
+            $parts = parse_url($url);
+            $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+
+            if (! in_array($scheme, ['http', 'https'], true) || ! isset($parts['host'])) {
+                return null;
             }
-        }
 
-        return [];
+            return $scheme.'://'.strtolower($parts['host']).':'.($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
+        };
+
+        return $origin($one) !== null && $origin($one) === $origin($other);
     }
 
     private function emailMatches(Authenticatable $user, string $email): bool
@@ -304,6 +385,10 @@ class SignInController extends Controller
             ->view('porro-filament::sign-in', ['reason' => $reason, 'email' => $email, 'login' => $login, ...$extra], $status)
             // A sign-in answer is for this visitor once, never for a cache.
             ->header('Cache-Control', 'no-store, private')
-            ->header('Referrer-Policy', 'no-referrer');
+            ->header('Referrer-Policy', 'no-referrer')
+            // And never inside another site's frame, where "Switch" could
+            // be dressed up as something else.
+            ->header('Content-Security-Policy', "frame-ancestors 'none'")
+            ->header('X-Frame-Options', 'DENY');
     }
 }
