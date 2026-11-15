@@ -62,9 +62,9 @@ function porroAnswers(int $status, array $body): void
     Http::fake(['porro.test/api/v1/sign-in/redeem' => Http::response($body, $status)]);
 }
 
-function member(string $email = 'daniel@1994.co.uk', bool $canUsePanel = true): SignInUser
+function member(string $email = 'sam@example.com', bool $canUsePanel = true): SignInUser
 {
-    return SignInUser::create(['name' => 'Daniel Jones', 'email' => $email, 'can_use_panel' => $canUsePanel]);
+    return SignInUser::create(['name' => 'Sam Patel', 'email' => $email, 'can_use_panel' => $canUsePanel]);
 }
 
 /**
@@ -127,7 +127,7 @@ it('only starts for a ticket posted from Porro’s own page', function (array $h
 ]);
 
 it('only signs in from this site’s own page', function (array $headers, bool $allowed) {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     member();
 
     $response = $this->flushHeaders()->post(signInUrl(), ['ticket' => TICKET], $headers);
@@ -179,7 +179,7 @@ it('is off on a copy of the site that isn’t live, unless the copy turns it on'
 });
 
 it('signs no one in when the users aren’t Eloquent models, as it can’t rule out a second account', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     member();
     config(['auth.providers.users' => ['driver' => 'database', 'table' => 'users']]);
 
@@ -191,7 +191,7 @@ it('signs no one in when the users aren’t Eloquent models, as it can’t rule 
 });
 
 it('signs the member in to the panel and sends them to it', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $user = member();
 
     $this->post(signInUrl(), ['ticket' => TICKET])->assertRedirect(Filament::getPanel('admin')->getUrl());
@@ -200,22 +200,22 @@ it('signs the member in to the panel and sends them to it', function () {
 });
 
 it('matches the email whatever its case', function (string $fromPorro, string $here) {
-    porroAnswers(200, ['ok' => true, 'email' => $fromPorro, 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => $fromPorro, 'name' => 'Sam Patel']);
     $user = member($here);
-    member('daniel@1994xco.uk');
+    member('sam@examplexcom');
 
     $this->post(signInUrl(), ['ticket' => TICKET])->assertRedirect(Filament::getPanel('admin')->getUrl());
 
     expect(Auth::id())->toBe($user->id);
 })->with([
-    'capitals in Porro' => ['Daniel@1994.co.UK', 'daniel@1994.co.uk'],
-    'capitals here' => ['daniel@1994.co.uk', 'Daniel@1994.co.UK'],
-    'capitals in both' => ['daniel@1994.CO.uk', 'Daniel@1994.co.UK'],
-    'an underscore' => ['Daniel_Jones@1994.co.uk', 'daniel_jones@1994.co.uk'],
+    'capitals in Porro' => ['Sam@example.COM', 'sam@example.com'],
+    'capitals here' => ['sam@example.com', 'Sam@example.COM'],
+    'capitals in both' => ['sam@EXAMPLE.com', 'Sam@example.COM'],
+    'an underscore' => ['Sam_Patel@example.com', 'sam_patel@example.com'],
 ]);
 
 it('signs no one in when more than one account uses the email, whatever its case', function (array $here) {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     foreach ($here as $email) {
         member($email);
     }
@@ -227,12 +227,12 @@ it('signs no one in when more than one account uses the email, whatever its case
     expect(Auth::check())->toBeFalse();
 })->with([
     // An exact match doesn't win over one that differs only in case.
-    'one exact, one not' => [['daniel@1994.co.uk', 'Daniel@1994.co.uk']],
-    'neither exact' => [['Daniel@1994.co.uk', 'daniel@1994.CO.UK']],
+    'one exact, one not' => [['sam@example.com', 'Sam@example.com']],
+    'neither exact' => [['Sam@example.com', 'sam@EXAMPLE.COM']],
 ]);
 
 it('redeems the ticket with a request signed by the site key', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     member();
 
     $this->post(signInUrl(), ['ticket' => TICKET]);
@@ -300,7 +300,7 @@ it('says so when there’s no user with the member’s email', function () {
 });
 
 it('won’t sign in a user whose canAccessPanel() says no', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $user = member(canUsePanel: false);
 
     $this->post(signInUrl(), ['ticket' => TICKET])
@@ -312,7 +312,7 @@ it('won’t sign in a user whose canAccessPanel() says no', function () {
 });
 
 it('only signs in a user model without FilamentUser on a local app, as Filament does', function (string $env, bool $signedIn) {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     config(['auth.providers.users.model' => User::class, 'app.env' => $env]);
     member();
 
@@ -377,7 +377,7 @@ it('treats a Porro error or an odd answer as Porro being unreachable', function 
 })->with([
     'server error' => [500, ['message' => 'Server Error']],
     'ok without an email' => [200, ['ok' => true]],
-    'not ok' => [200, ['ok' => false, 'email' => 'daniel@1994.co.uk']],
+    'not ok' => [200, ['ok' => false, 'email' => 'sam@example.com']],
 ]);
 
 it('says the site key was refused when Porro rejects the signature', function () {
@@ -404,7 +404,7 @@ it('signs in to the panel PORRO_SIGN_IN_PANEL names, on that panel’s guard', f
         'porro.sign_in_panel' => 'staff',
     ]);
     app(PanelRegistry::class)->register(Panel::make()->id('staff')->path('staff')->authGuard('staff'));
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $user = member();
 
     $this->post(signInUrl(), ['ticket' => TICKET])->assertRedirect(url('staff'));
@@ -452,7 +452,7 @@ it('is limited to 10 tries a minute from one IP', function () {
 });
 
 it('isn’t turned away for a missing CSRF token outside tests', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $user = member();
     // Laravel skips CSRF checks while running tests; pretend it's live.
     $this->app['env'] = 'production';
@@ -473,14 +473,14 @@ function switchToken(string $html): string
 }
 
 it('asks before switching when someone else is signed in, and switches only on the yes', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $current = member('ada@example.com');
     $user = member();
     $this->actingAs($current);
 
     $page = $this->post(signInUrl(), ['ticket' => TICKET])
         ->assertOk()
-        ->assertSee('You’re signed in as ada@example.com. Switch to daniel@1994.co.uk?', false)
+        ->assertSee('You’re signed in as ada@example.com. Switch to sam@example.com?', false)
         ->assertSee(route('porro.sign-in.confirm'))
         ->assertDontSee(TICKET)
         ->assertHeader('Cache-Control', 'no-store, private')
@@ -499,7 +499,7 @@ it('asks before switching when someone else is signed in, and switches only on t
 });
 
 it('takes the switch once only', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $current = member('ada@example.com');
     member();
     $this->actingAs($current);
@@ -513,7 +513,7 @@ it('takes the switch once only', function () {
 });
 
 it('lets the switch lapse after five minutes', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $current = member('ada@example.com');
     member();
     $this->actingAs($current);
@@ -526,7 +526,7 @@ it('lets the switch lapse after five minutes', function () {
 });
 
 it('won’t switch for a token shown to someone else, or one it didn’t make', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $current = member('ada@example.com');
     $other = member('bea@example.com');
     $user = member();
@@ -546,7 +546,7 @@ it('won’t switch for a token shown to someone else, or one it didn’t make', 
 });
 
 it('checks CSRF on the switch, as it’s posted from this site', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']);
     $current = member('ada@example.com');
     member();
     $this->actingAs($current);
@@ -561,7 +561,7 @@ it('checks CSRF on the switch, as it’s posted from this site', function () {
 });
 
 it('just opens the panel when the member is already signed in as themselves', function () {
-    porroAnswers(200, ['ok' => true, 'email' => 'Daniel@1994.co.uk', 'name' => 'Daniel Jones']);
+    porroAnswers(200, ['ok' => true, 'email' => 'Sam@example.com', 'name' => 'Sam Patel']);
     $user = member();
     $this->actingAs($user);
 
