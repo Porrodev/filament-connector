@@ -130,7 +130,7 @@ it('only signs in from this site’s own page', function (array $headers, bool $
     porroAnswers(200, ['ok' => true, 'email' => 'daniel@1994.co.uk', 'name' => 'Daniel Jones']);
     member();
 
-    $response = $this->withoutHeader('Sec-Fetch-Site')->post(signInUrl(), ['ticket' => TICKET], $headers);
+    $response = $this->flushHeaders()->post(signInUrl(), ['ticket' => TICKET], $headers);
 
     if ($allowed) {
         $response->assertRedirect(Filament::getPanel('admin')->getUrl());
@@ -555,7 +555,7 @@ it('checks CSRF on the switch, as it’s posted from this site', function () {
     // without it, only the token will do.
     $this->app['env'] = 'production';
 
-    $this->withoutHeader('Sec-Fetch-Site')->post(route('porro.sign-in.confirm'), ['token' => $token])->assertStatus(419);
+    $this->flushHeaders()->post(route('porro.sign-in.confirm'), ['token' => $token])->assertStatus(419);
 
     expect(Auth::id())->toBe($current->id);
 });
