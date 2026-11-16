@@ -7,6 +7,7 @@ use BladeUI\Icons\BladeIconsServiceProvider;
 use Filament\Actions\ActionsServiceProvider;
 use Filament\FilamentServiceProvider;
 use Filament\Forms\FormsServiceProvider;
+use Filament\Http\Middleware\Authenticate;
 use Filament\Infolists\InfolistsServiceProvider;
 use Filament\Notifications\NotificationsServiceProvider;
 use Filament\Panel;
@@ -15,6 +16,7 @@ use Filament\Schemas\SchemasServiceProvider;
 use Filament\Support\SupportServiceProvider;
 use Filament\Tables\TablesServiceProvider;
 use Filament\Widgets\WidgetsServiceProvider;
+use Illuminate\Session\Middleware\StartSession;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Porro\Core\CrontabIo;
@@ -72,6 +74,10 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel->default()->id('admin')->path('admin')->login()->plugin(PorroPlugin::make());
+        // A session and the panel's own sign-in check, as an app's panel has.
+        return $panel->default()->id('admin')->path('admin')->login()
+            ->middleware([StartSession::class])
+            ->authMiddleware([Authenticate::class])
+            ->plugin(PorroPlugin::make());
     }
 }

@@ -76,6 +76,16 @@ Whoever can see the pages, unless you narrow it. In order:
 
 Everyone else sees the lists but no buttons, and the server refuses their changes too.
 
+### Who can connect the site to Porro
+
+The **Connect to Porro** button on Site Health (see [Connect Porro](#connect-porro-optional)) gives the site a key, so seeing the page is never enough. Among those who can see it, in order:
+
+1. Your `authorizeConnect()` callback: `PorroPlugin::make()->authorizeConnect(fn (User $user) => $user->is_owner)`
+2. Otherwise, a `connectPorro` gate: `Gate::define('connectPorro', fn (User $user) => $user->is_owner);`
+3. Otherwise, admins, by the same markers as above.
+
+Everyone else sees the `porro:connect` command as before, and the server refuses to start or finish connecting for them.
+
 ## Suspicious activity and blocking
 
 Free, and on the app itself. IP addresses aren't sent to Porro, and only leave the server in the cases listed under [Where IP addresses go](https://github.com/Porrodev/laravel-connector#where-ip-addresses-go): Cloudflare and reverse-DNS lookups on an IP's details page, the AbuseIPDB button, and blocking at Cloudflare. The rules are the [Laravel connector's](https://github.com/Porrodev/laravel-connector#suspicious-activity-and-blocking), so its README has every setting.
@@ -130,6 +140,8 @@ The page then shows the site's open findings in Porro alongside the checks above
 ![Porro Site Health connected to Porro, in dark mode: an end-of-life server, an expiring certificate and domain, and a slow region, above the checks run on the site](https://raw.githubusercontent.com/Porrodev/filament-connector/main/docs/images/filament-site-health-dark.png)
 
 Connecting also sends Porro a signed report every 15 minutes on Laravel's scheduler: Filament, Livewire, plugin and package versions, each panel's id, path, whether it has a login and (from Filament 4) whether multi-factor authentication is required, plus the health facts above. Never content, users or settings values. Run `php artisan porro:status --json` to see exactly what would be sent, and see the [Laravel connector](https://github.com/Porrodev/laravel-connector) for config and commands.
+
+Or connect from the panel, with no key to copy. On the live site, **Porro → Site Health** has a **Connect to Porro** button for [whoever may connect](#who-can-connect-the-site-to-porro). It opens Porro, where you sign in and approve, and brings you back connected. The key is made on the site and kept encrypted in its database (run `php artisan migrate` first, for the `porro_settings` table). `PORRO_KEY` in the environment wins when it's set. A copy whose `APP_ENV` isn't production has no button and says why.
 
 `porro:connect` offers to add the scheduler's cron line; `php artisan porro:cron` adds it on its own and, once the site is connected, sends a report straight away. See [Scheduling reports](#scheduling-reports) to add it on Forge, Ploi, Laravel Cloud and other hosts.
 

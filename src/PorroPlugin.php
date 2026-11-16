@@ -29,6 +29,10 @@ use Throwable;
  *
  * Who can block and safelist IPs: your authorizeManage() callback; else
  * a "managePorroBlocklist" gate; else whoever can see it.
+ *
+ * Who can connect the site to Porro, among those who can see it: your
+ * authorizeConnect() callback; else a "connectPorro" gate; else admins,
+ * by the same markers. Seeing the page is never enough.
  */
 class PorroPlugin implements Plugin
 {
@@ -36,11 +40,15 @@ class PorroPlugin implements Plugin
 
     public const MANAGE_GATE = 'managePorroBlocklist';
 
+    public const CONNECT_GATE = 'connectPorro';
+
     public const GROUP = 'Porro';
 
     protected ?Closure $authorize = null;
 
     protected ?Closure $authorizeManage = null;
+
+    protected ?Closure $authorizeConnect = null;
 
     protected bool $widget = true;
 
@@ -88,6 +96,16 @@ class PorroPlugin implements Plugin
     public function authorizeManage(Closure $using): static
     {
         $this->authorizeManage = $using;
+
+        return $this;
+    }
+
+    /**
+     * @param  Closure(Authenticatable|null $user): bool  $using
+     */
+    public function authorizeConnect(Closure $using): static
+    {
+        $this->authorizeConnect = $using;
 
         return $this;
     }
@@ -165,6 +183,28 @@ class PorroPlugin implements Plugin
         }
 
         return true;
+    }
+
+    /**
+     * Connecting gives this site a key: never on viewing alone.
+     */
+    public function canConnect(?Authenticatable $user): bool
+    {
+        // Always someone with an id: the request to connect is tied to
+        // whoever started it.
+        if (! $this->canView($user) || (string) $user->getAuthIdentifier() === '') {
+            return false;
+        }
+
+        if ($this->authorizeConnect) {
+            return (bool) ($this->authorizeConnect)($user);
+        }
+
+        if (Gate::has(self::CONNECT_GATE)) {
+            return Gate::forUser($user)->allows(self::CONNECT_GATE);
+        }
+
+        return $this->isAdmin($user) ?? false;
     }
 
     /**

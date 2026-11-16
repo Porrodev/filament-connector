@@ -63,6 +63,9 @@ it('leaves the panel’s other pages alone', function () {
 
 it('shows the site’s health without a Porro account, with the connect command', function () {
     config(['porro.key' => null]);
+    // The live site, seen by someone who may not connect it from the panel.
+    $this->app['env'] = 'production';
+    Gate::define(PorroPlugin::CONNECT_GATE, fn () => false);
     $this->actingAs(panelUser());
 
     Livewire::test(SiteHealthPage::class)
