@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-11-16
 
 - **Sign in from Porro**: with Porro's **Sign in to client sites** on, **Sign in to Filament** on the site page in Porro opens the panel signed in, without a password. Porro posts a one-time, 60-second ticket to `/porro/sign-in`; the site redeems it with Porro using its own site key and signs in the panel's user with the member's email, on the panel's own guard. It never creates users or changes roles, and only signs in users `canAccessPanel()` lets in. It uses the default panel, or the one `PORRO_SIGN_IN_PANEL` names. It's on for the live site and off on staging and local copies unless they set `PORRO_SIGN_IN=true`; `PORRO_SIGN_IN=false` turns it off on the site. The panel's users must be Eloquent models. More than one account with the email, in any case, signs no one in, and if someone else is already signed in it asks before switching accounts.
 - Filament 3 sites on Laravel 10 can install the connector, with `porro/laravel-connector` 0.3.8 or later. CI now tests Laravel 10 too.
