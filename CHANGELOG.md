@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2026-11-16
 
 - **Disconnect from Porro.** A site connected from the panel has a **Disconnect** button on Site Health, beside **Open in Porro**, for whoever may connect. It asks first, saying what stops and what carries on, then tells Porro and deletes the key from the site's database. The checks that run on the site carry on, and you can connect again at any time. If Porro can't be reached the key is still deleted, and the page says Porro wasn't told. `php artisan porro:disconnect` does the same from the terminal.
 - A site connected with `PORRO_KEY` in its environment has no button: Site Health says to remove `PORRO_KEY` and deploy.
