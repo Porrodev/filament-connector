@@ -2,6 +2,7 @@
 
 namespace Porro\Filament\Pages;
 
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
 use Illuminate\Contracts\Support\Htmlable;
@@ -10,6 +11,8 @@ use Illuminate\Support\HtmlString;
 use Porro\Filament\Pages\Concerns\ManagesBlocklist;
 use Porro\Filament\PorroPlugin;
 use Porro\Filament\SiteHealthView;
+use Porro\Laravel\Connect\ConnectFailure;
+use Porro\Laravel\Connect\PanelConnect;
 use Porro\Laravel\SiteHealth;
 
 /**
@@ -83,6 +86,61 @@ class SiteHealthPage extends Page
         return (bool) PorroPlugin::current()?->canView(auth()->user());
     }
 
+    /**
+     * Connecting has its own say-so: seeing the page isn't enough.
+     */
+    public static function canConnect(): bool
+    {
+        return (bool) PorroPlugin::current()?->canConnect(filament()->auth()->user());
+    }
+
+    /**
+     * Porro sends the browser back to this page with a grant, and this
+     * finishes connecting. The page's own address is the return address,
+     * so it's behind the panel's sign-in and guard like any other visit.
+     * Whatever happens, the browser moves on to an address without the
+     * grant in it.
+     */
+    public function mount(PanelConnect $connect): void
+    {
+        if (! $connect->returning(request())) {
+            return;
+        }
+
+        abort_unless(static::canConnect(), 403);
+
+        try {
+            $next = $connect->finish(request(), static::connectUser());
+        } catch (ConnectFailure $e) {
+            static::couldNotConnect($e);
+            $this->redirect(static::getUrl());
+
+            return;
+        }
+
+        if ($next === null) {
+            Notification::make()->title(__('Connected to Porro. The first report has been sent.'))->success()->send();
+        }
+
+        $this->redirect($next ?? static::getUrl());
+    }
+
+    /**
+     * "Connect to Porro": ask Porro, then send the browser there to approve.
+     */
+    public function connectToPorro(PanelConnect $connect): void
+    {
+        abort_unless(static::canConnect(), 403);
+
+        try {
+            // The return address as a path: the host comes from the one
+            // the browser is on, not from APP_URL.
+            $this->redirect($connect->start(request(), (string) parse_url(static::getUrl(), PHP_URL_PATH), static::connectUser()));
+        } catch (ConnectFailure $e) {
+            static::couldNotConnect($e);
+        }
+    }
+
     public function getView(): string
     {
         return 'porro-filament::page';
@@ -100,10 +158,32 @@ class SiteHealthPage extends Page
      */
     protected function getViewData(): array
     {
-        return app(SiteHealthView::class)->data() + [
+        $view = app(SiteHealthView::class);
+        $data = $view->data();
+
+        return $data + [
+            'connect' => $view->connect($data['connected'], $data['porroUrl'], static::canConnect()),
             'canManage' => static::canManage(),
             'blockingUrl' => BlockingPage::getUrl(),
             'ipUrl' => IpPage::getUrl(),
         ];
+    }
+
+    /**
+     * Whoever is signed in to the panel. canConnect() has already turned
+     * away anyone without an id.
+     */
+    private static function connectUser(): string
+    {
+        return (string) filament()->auth()->user()?->getAuthIdentifier();
+    }
+
+    /**
+     * The reason, in words, and it stays until it's closed. Escaped: it
+     * can carry what Porro said, and notifications render HTML.
+     */
+    private static function couldNotConnect(ConnectFailure $e): void
+    {
+        Notification::make()->title(__('Couldn’t connect to Porro'))->body(e($e->getMessage()))->danger()->persistent()->send();
     }
 }

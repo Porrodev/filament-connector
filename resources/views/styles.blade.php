@@ -3,6 +3,12 @@
     <style>
         .porro-health { display: flex; flex-direction: column; gap: 1rem; }
         .porro-health-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+        .porro-health-connect { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2rem; }
+        .porro-health-connect-text { flex: 1 1 20rem; min-width: 0; display: flex; flex-direction: column; gap: .375rem; font-size: .875rem; }
+        .porro-health-connect-title { font-size: 1rem; font-weight: 600; }
+        /* Black on a light panel, near-white on a dark one: black on a dark card disappears. */
+        .porro-health-connect-button { background: #0a0a0a; color: #fff; }
+        .dark .porro-health-connect-button { background: #f2f2f0; color: #0a0a0a; }
         .porro-health-muted { color: rgb(107 114 128); }
         .dark .porro-health-muted { color: rgb(156 163 175); }
         .porro-health-small { font-size: .8125rem; }

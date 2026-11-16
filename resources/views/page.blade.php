@@ -9,6 +9,8 @@
             </x-filament::button>
         </div>
 
+        @includeWhen($connect['panel'], 'porro-filament::connect')
+
         @if ($failed)
             <x-filament::section>
                 <p>{{ __('The checks couldn’t run just now. Try again in a minute; the error is in the Laravel log.') }}</p>
@@ -57,7 +59,7 @@
             @include('porro-filament::activity')
         @endif
 
-        @unless ($connected)
+        @if ($connect['upsell'])
             <x-filament::section :heading="__('Watch this site from outside too')">
                 <div class="porro-health-stack">
                     <p>{{ __('These checks run inside the site. Porro watches it from outside as well, alongside every other site you look after:') }}</p>
@@ -74,6 +76,6 @@
                     </p>
                 </div>
             </x-filament::section>
-        @endunless
+        @endif
     </div>
 </x-filament-panels::page>
