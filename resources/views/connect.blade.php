@@ -1,11 +1,24 @@
-{{-- Connect to Porro: the live site not connected, a development copy, or connected from here. --}}
-<x-filament::section :heading="$connect['state'] === 'connected' ? __('Connected to Porro') : __('Not connected to Porro')">
+{{-- Connect to Porro: the live site not connected, a development copy, connected from here, or a key Porro turned away. --}}
+<x-filament::section :heading="match (true) {
+    $connect['state'] === 'connected' => __('Connected to Porro'),
+    $connect['turnedAway'] !== null => __('No longer connected to Porro'),
+    default => __('Not connected to Porro'),
+}">
     <div class="porro-health-connect">
         <div class="porro-health-connect-text">
             @if ($connect['state'] === 'connected')
                 <p class="porro-health-connect-title">{{ $connect['workspace'] ? __('Connected to :workspace', ['workspace' => $connect['workspace']]) : __('Connected to Porro') }}</p>
                 <p>{{ $connect['approvedAgo'] ? __('Approved :ago.', ['ago' => $connect['approvedAgo']]) : '' }} {{ __('The first report has been sent, and Porro now checks this site every hour.') }}</p>
                 <p class="porro-health-small porro-health-muted">{{ __('The key was made on this site and is kept encrypted in its database.') }}</p>
+            @elseif ($connect['turnedAway'])
+                @php($from = $connect['turnedAway']['workspace'] ?? __('Porro'))
+                <p class="porro-health-connect-title">{{ __('Porro turned this site’s key away') }}</p>
+                <p>
+                    {{ __('The site was removed from :workspace, or given a new key there.', ['workspace' => $from]) }}
+                    {{ $connect['turnedAway']['date'] ? __('Reports stopped on :date at :time.', ['date' => $connect['turnedAway']['date'], 'time' => $connect['turnedAway']['time']]) : __('Reports have stopped.') }}
+                    {{ __('The old key has been deleted from this site.') }}
+                </p>
+                <p class="porro-health-small porro-health-muted">{{ __('Connect again to carry on. Opens :host to sign in and approve.', ['host' => $connect['porroHost']]) }}</p>
             @elseif ($connect['state'] === 'development')
                 <p class="porro-health-connect-title">{{ __('This is a development copy') }}</p>
                 <p>{{ __('Its environment is “:environment”, so it does not connect and sends no reports. Deploy, then connect from the live site’s control panel. The checks below still run here.', ['environment' => $connect['environment']]) }}</p>
@@ -17,10 +30,18 @@
             @endif
         </div>
         @if ($connect['state'] === 'connected')
-            <x-filament::button tag="a" :href="$connect['openUrl']" target="_blank" color="gray">
-                {{ __('Open in Porro') }}
-            </x-filament::button>
-        @elseif ($connect['state'] === 'ready')
+            <div class="porro-health-connect-actions">
+                @if ($connect['canDisconnect'])
+                    {{-- Quiet beside "Open in Porro": it asks before anything happens. --}}
+                    <x-filament::link tag="button" color="gray" wire:click="mountAction('disconnectFromPorro')">
+                        {{ __('Disconnect') }}
+                    </x-filament::link>
+                @endif
+                <x-filament::button tag="a" :href="$connect['openUrl']" target="_blank" color="gray">
+                    {{ __('Open in Porro') }}
+                </x-filament::button>
+            </div>
+        @elseif ($connect['state'] === 'ready' && $connect['canConnect'])
             {{-- The branded button: black, or near-white on a dark panel so it still stands out. The mark keeps its own colours on its black tile. --}}
             <button type="button" class="porro-health-connect-button" wire:click="connectToPorro" wire:loading.attr="disabled" wire:target="connectToPorro" style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 10px; padding: 9px 18px 9px 12px; border: 0; border-radius: 8px; font-size: 15px; font-weight: 500; line-height: normal; white-space: nowrap; cursor: pointer">
                 <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 5.647px; background: #000" aria-hidden="true">

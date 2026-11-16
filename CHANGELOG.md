@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Disconnect from Porro.** A site connected from the panel has a **Disconnect** button on Site Health, beside **Open in Porro**, for whoever may connect. It asks first, saying what stops and what carries on, then tells Porro and deletes the key from the site's database. The checks that run on the site carry on, and you can connect again at any time. If Porro can't be reached the key is still deleted, and the page says Porro wasn't told. `php artisan porro:disconnect` does the same from the terminal.
+- A site connected with `PORRO_KEY` in its environment has no button: Site Health says to remove `PORRO_KEY` and deploy.
+- If the site is removed in Porro, or given a new key there, Site Health now says **No longer connected to Porro**, with when reports stopped and the button to connect again, in place of the plain "not connected" card. The old key is deleted from the site.
+- Requires `porro/laravel-connector` 0.3.11 and `porro/php-core` 0.3.9.
+
 ## 0.5.0 - 2026-11-16
 
 - **Connect to Porro from the panel.** On the live site, Site Health has a **Connect to Porro** button in place of the `porro:connect` command: it opens Porro to sign in and approve, and the site is connected when the browser comes back. No key to copy. The key is made on the site and kept encrypted in its database; `PORRO_KEY` in the environment still wins, so sites connected that way are unchanged. Requires `porro/laravel-connector` 0.3.10 and `porro/php-core` 0.3.8, and `php artisan migrate` for the new `porro_settings` table.

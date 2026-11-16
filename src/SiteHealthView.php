@@ -63,18 +63,22 @@ class SiteHealthView
      *
      * The live site with no key shows the button, to whoever may connect.
      * A copy that isn't production shows why it doesn't connect instead.
-     * A site connected from here says who to. A site with PORRO_KEY in its
-     * environment shows none of this: it's connected the way it always was.
+     * A site connected from here says who to, and whoever may connect can
+     * disconnect it. A site with PORRO_KEY in its environment has no panel:
+     * it's connected the way it always was, and only reads how to undo that.
+     * A site whose key Porro turned away says so until it connects again.
      *
-     * @return array{panel: bool, upsell: bool, state: string, environment: string, porroHost: string, workspace: string|null, approvedAgo: string|null, openUrl: string}
+     * @return array{panel: bool, upsell: bool, state: string, environment: string, porroHost: string, workspace: string|null, host: string|null, approvedAgo: string|null, openUrl: string, canConnect: bool, canDisconnect: bool, envKey: bool, turnedAway: array{workspace: string|null, date: string|null, time: string|null}|null}
      */
     public function connect(bool $connected, ?string $siteUrl, bool $canConnect): array
     {
         $state = $this->connect->state();
         $stored = $state === PanelConnect::CONNECTED ? $this->keys->stored() : null;
+        $turnedAway = in_array($state, [PanelConnect::READY, PanelConnect::DEVELOPMENT, PanelConnect::OFF], true) ? self::turnedAway($this->keys->turnedAway()) : null;
         $panel = match ($state) {
-            PanelConnect::READY => $canConnect,
+            PanelConnect::READY => $canConnect || $turnedAway !== null,
             PanelConnect::DEVELOPMENT, PanelConnect::CONNECTED => true,
+            PanelConnect::OFF => $turnedAway !== null,
             default => false,
         };
 
@@ -86,8 +90,37 @@ class SiteHealthView
             'environment' => (string) app()->environment(),
             'porroHost' => self::porroHost(),
             'workspace' => $stored['workspace'] ?? null,
+            'host' => $stored['host'] ?? null,
             'approvedAgo' => self::since($stored['connected_at'] ?? null),
             'openUrl' => $siteUrl ?? rtrim((string) config('porro.url'), '/'),
+            'canConnect' => $canConnect,
+            // Only a key kept here can be removed here, by whoever may connect.
+            'canDisconnect' => $canConnect && $state === PanelConnect::CONNECTED,
+            'envKey' => $state === PanelConnect::ENV && $connected,
+            'turnedAway' => $turnedAway,
+        ];
+    }
+
+    /**
+     * When Porro turned the stored key away, in the site's own timezone.
+     *
+     * @param  array{workspace: string|null, at: string|null}|null  $turnedAway
+     * @return array{workspace: string|null, date: string|null, time: string|null}|null
+     */
+    private static function turnedAway(?array $turnedAway): ?array
+    {
+        if ($turnedAway === null) {
+            return null;
+        }
+
+        $at = $turnedAway['at'] !== null && strtotime($turnedAway['at']) !== false
+            ? Carbon::parse($turnedAway['at'])->setTimezone((string) config('app.timezone', 'UTC'))
+            : null;
+
+        return [
+            'workspace' => $turnedAway['workspace'],
+            'date' => $at?->translatedFormat('j F'),
+            'time' => $at?->format('H:i'),
         ];
     }
 
