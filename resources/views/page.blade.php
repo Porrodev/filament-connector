@@ -9,6 +9,20 @@
             </x-filament::button>
         </div>
 
+        @if ($disconnected)
+            {{-- Once, straight after disconnecting: what happened, and what Porro knows. --}}
+            @php($from = $disconnected['workspace'] ?? __('Porro'))
+            <div class="porro-health-notice" role="status">
+                @if ($disconnected['told'])
+                    <p class="porro-health-notice-title">{{ __('Disconnected from :workspace', ['workspace' => $from]) }}</p>
+                    <p class="porro-health-muted">{{ __('This site no longer sends reports, and its key has been deleted. :workspace still has the site in Porro; someone in that workspace can remove it there.', ['workspace' => $from]) }}</p>
+                @else
+                    <p class="porro-health-notice-title">{{ __('Disconnected on this site') }}</p>
+                    <p class="porro-health-muted">{{ __('The key has been deleted and reports have stopped. Porro didn’t answer, so it hasn’t been told: :workspace will see this site as not reporting, not as disconnected.', ['workspace' => $from]) }}</p>
+                @endif
+            </div>
+        @endif
+
         @includeWhen($connect['panel'], 'porro-filament::connect')
 
         @if ($failed)
@@ -33,6 +47,10 @@
                             {{ __('Open this site in Porro') }}
                         </x-filament::link>
                     </p>
+                @endif
+
+                @if ($connect['envKey'])
+                    <p class="porro-health-small porro-health-muted porro-health-gap">{{ __('To disconnect, remove PORRO_KEY from the environment and deploy. The control panel can’t change it.') }}</p>
                 @endif
             </x-filament::section>
         @endif

@@ -2,18 +2,23 @@
 
 namespace Porro\Filament\Pages;
 
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Panel;
+use Filament\Support\Enums\Alignment;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
+use Livewire\Attributes\Locked;
 use Porro\Filament\Pages\Concerns\ManagesBlocklist;
 use Porro\Filament\PorroPlugin;
 use Porro\Filament\SiteHealthView;
 use Porro\Laravel\Connect\ConnectFailure;
+use Porro\Laravel\Connect\Disconnect;
 use Porro\Laravel\Connect\PanelConnect;
 use Porro\Laravel\SiteHealth;
+use Porro\Laravel\SiteKeys;
 
 /**
  * The site's health: checks run on the site, and its Porro findings once
@@ -29,6 +34,15 @@ class SiteHealthPage extends Page
     protected static ?string $porroGroup = null;
 
     protected static ?int $porroSort = null;
+
+    /**
+     * Set by disconnecting, for the notice above the connect card. It
+     * lasts for this view of the page and is gone on the next.
+     *
+     * @var array{workspace: string|null, told: bool}|null
+     */
+    #[Locked]
+    public ?array $disconnected = null;
 
     public static function configure(?string $group, ?int $sort): void
     {
@@ -141,6 +155,57 @@ class SiteHealthPage extends Page
         }
     }
 
+    /**
+     * Disconnecting is undoing "Connect to Porro", so it's for the same
+     * people, and only for a key kept on this site: never PORRO_KEY, and
+     * never from a copy that isn't the live site.
+     */
+    public static function canDisconnect(): bool
+    {
+        return static::canConnect() && app(PanelConnect::class)->state() === PanelConnect::CONNECTED;
+    }
+
+    /**
+     * "Disconnect" on the connected card opens this with
+     * mountAction('disconnectFromPorro'): Filament's own confirmation
+     * modal, saying what stops and what carries on.
+     */
+    public function disconnectFromPorroAction(): Action
+    {
+        $stored = fn (): array => app(SiteKeys::class)->stored() ?? [];
+        $workspace = fn (): string => $stored()['workspace'] ?? __('Porro');
+
+        return Action::make('disconnectFromPorro')
+            ->label(__('Disconnect'))
+            ->requiresConfirmation()
+            ->color('danger')
+            ->modalWidth('lg')
+            ->modalAlignment(Alignment::Start)
+            ->modalFooterActionsAlignment(Alignment::End)
+            ->modalHeading(fn () => __('Disconnect :host from Porro?', ['host' => $stored()['host'] ?? __('this site')]))
+            ->modalDescription(fn () => __('This site stops sending reports to :workspace, and its key is deleted from this site.', ['workspace' => $workspace()]))
+            ->modalContent(fn () => view('porro-filament::disconnect', ['workspace' => $workspace()]))
+            ->modalSubmitActionLabel(__('Disconnect'))
+            ->modalCancelActionLabel(__('Cancel'))
+            ->visible(fn () => static::canDisconnect())
+            ->action(fn () => $this->disconnectFromPorro());
+    }
+
+    /**
+     * Tell Porro and delete the key, whatever Porro answered. Only ever
+     * reached through the confirmation above.
+     */
+    private function disconnectFromPorro(): void
+    {
+        abort_unless(static::canDisconnect(), 403);
+
+        $result = app(Disconnect::class)->disconnect();
+
+        if ($result !== null) {
+            $this->disconnected = ['workspace' => $result['workspace'], 'told' => $result['told']];
+        }
+    }
+
     public function getView(): string
     {
         return 'porro-filament::page';
@@ -163,6 +228,7 @@ class SiteHealthPage extends Page
 
         return $data + [
             'connect' => $view->connect($data['connected'], $data['porroUrl'], static::canConnect()),
+            'disconnected' => $this->disconnected,
             'canManage' => static::canManage(),
             'blockingUrl' => BlockingPage::getUrl(),
             'ipUrl' => IpPage::getUrl(),

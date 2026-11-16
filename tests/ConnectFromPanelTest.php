@@ -7,6 +7,7 @@ use Filament\Notifications\NotificationMailbox;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as Sent;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
@@ -67,7 +68,7 @@ beforeEach(function () {
  */
 function porroFake(array $answers = []): ArrayObject
 {
-    $porro = new ArrayObject(['public_key' => null, 'starts' => [], 'completes' => [], 'reports' => []]);
+    $porro = new ArrayObject(['public_key' => null, 'starts' => [], 'completes' => [], 'reports' => [], 'disconnects' => []]);
 
     $signed = function (Sent $request, string $path) use ($porro): bool {
         $headers = array_map(fn ($v) => $v[0], $request->headers());
@@ -94,6 +95,12 @@ function porroFake(array $answers = []): ArrayObject
             $porro['reports'][] = $request;
 
             return Http::response(['ok' => true], 202);
+        },
+        'porro.test/api/v1/disconnect' => function (Sent $request) use ($porro, $answers) {
+            $porro['disconnects'][] = $request;
+            [$status, $body] = $answers['disconnect'] ?? [200, ['ok' => true]];
+
+            return Http::response($body, $status);
         },
         'porro.test/api/v1/findings' => Http::response(['ok' => true, 'site' => ['url' => 'https://porro.test/marlowe/sites/harbour-arts'], 'findings' => []]),
         'porro.test/api/v1/sign-in/redeem' => Http::response(['ok' => true, 'email' => 'sam@example.com', 'name' => 'Sam Patel']),
@@ -144,6 +151,27 @@ function returnFromPorro($test, SignInUser $user, array $query = []): TestRespon
     $query += ['porro_request' => CONNECT_REQUEST, 'porro_grant' => 'the-grant', 'porro_next' => CONNECT_NEXT];
 
     return $test->actingAs($user)->get(HARBOUR_HEALTH.'?'.http_build_query($query));
+}
+
+/**
+ * A site connected from the panel, with its key kept in the database.
+ */
+function connected(?string $workspace = 'Marlowe Studio', ?string $host = 'harbour-arts.org'): SiteKey
+{
+    $key = SiteKey::generate()->withSite(CONNECT_SITE);
+    app(SiteKeys::class)->store($key, $workspace, $host);
+
+    return $key;
+}
+
+/**
+ * Press "Disconnect", then the modal's own Disconnect.
+ */
+function disconnect($test, SignInUser $user): Testable
+{
+    $test->actingAs($user);
+
+    return Livewire::test(SiteHealthPage::class)->call('mountAction', 'disconnectFromPorro')->call('callMountedAction');
 }
 
 /**
@@ -258,6 +286,9 @@ describe('what Site Health shows', function () {
 
         expect(siteHealth($this, sam()))
             ->toContain('From Porro')
+            // Only how to undo it, which the panel can't do.
+            ->toContain('To disconnect, remove PORRO_KEY from the environment and deploy. The control panel can’t change it.')
+            ->not->toContain("mountAction('disconnectFromPorro')")
             ->not->toContain('Connect to Porro')
             ->not->toContain('Connected to Porro')
             ->not->toContain('Not connected to Porro')
@@ -433,6 +464,248 @@ describe('connecting', function () {
 
         expect(notices())->toContain('proxy')
             ->and($porro['starts'])->toBeEmpty();
+    });
+});
+
+describe('disconnecting', function () {
+    it('offers a quiet Disconnect beside Open in Porro to whoever may connect', function () {
+        porroFake();
+        connected();
+
+        $html = siteHealth($this, sam());
+
+        expect($html)->toContain('wire:click="mountAction(\'disconnectFromPorro\')"')
+            ->and(strpos($html, "mountAction('disconnectFromPorro')"))->toBeLessThan(strpos($html, 'Open in Porro'))
+            // Seeing the page isn't enough, as with connecting.
+            ->and(siteHealth($this, viewer()))->toContain('Open in Porro')->not->toContain('disconnectFromPorro');
+    });
+
+    it('asks first, in Filament’s own modal, saying what stops and what carries on', function () {
+        $porro = porroFake();
+        connected();
+        $this->actingAs(sam());
+
+        $page = Livewire::test(SiteHealthPage::class)->call('mountAction', 'disconnectFromPorro');
+
+        $action = $page->instance()->getMountedAction();
+
+        expect($action->getModalHeading())->toBe('Disconnect harbour-arts.org from Porro?')
+            ->and($action->getModalDescription())->toBe('This site stops sending reports to Marlowe Studio, and its key is deleted from this site.')
+            ->and($action->getModalSubmitActionLabel())->toBe('Disconnect')
+            ->and($action->getModalCancelActionLabel())->toBe('Cancel')
+            ->and($action->getColor())->toBe('danger')
+            ->and(html_entity_decode($action->getModalContent()->render(), ENT_QUOTES))
+            ->toContain('Stops')
+            ->toContain('Hourly reports of what is installed here, and signing in to this site from Porro.')
+            ->toContain('Carries on')
+            ->toContain('The checks on this page. They run on this site and need no account.')
+            ->toContain('In Porro')
+            ->toContain('Marlowe Studio keeps the site and its history. Uptime, SSL and domain checks go on from outside until someone removes the site there.')
+            ->toContain('You can connect again at any time.');
+
+        // Nothing changes until it's confirmed.
+        expect($porro['disconnects'])->toBeEmpty()
+            ->and((new SiteKeys)->token())->not->toBeNull();
+    });
+
+    it('tells Porro, deletes the key and says so above the connect card', function () {
+        $porro = porroFake();
+        $key = connected();
+        $user = sam();
+
+        $html = html_entity_decode(disconnect($this, $user)->assertSuccessful()->html(), ENT_QUOTES);
+
+        expect($porro['disconnects'])->toHaveCount(1)
+            // Signed as the site, and nothing about who pressed it.
+            ->and($porro['disconnects'][0]->header('X-Porro-Site')[0])->toBe($key->siteId)
+            ->and($porro['disconnects'][0]->body())->toBe('{}')
+            ->and((new SiteKeys)->token())->toBeNull()
+            ->and((new SiteKeys)->turnedAway())->toBeNull()
+            ->and($html)
+            ->toContain('Disconnected from Marlowe Studio')
+            ->toContain('This site no longer sends reports, and its key has been deleted. Marlowe Studio still has the site in Porro; someone in that workspace can remove it there.')
+            ->toContain('Not connected to Porro')
+            ->toContain('wire:click="connectToPorro"')
+            ->not->toContain('Connected to Marlowe Studio')
+            ->not->toContain('From Porro')
+            ->and(strpos($html, 'Disconnected from Marlowe Studio'))->toBeLessThan(strpos($html, 'Not connected to Porro'));
+
+        // The notice is for that view only.
+        expect(siteHealth($this, $user))
+            ->toContain('Not connected to Porro')
+            ->not->toContain('Disconnected from Marlowe Studio');
+    });
+
+    it('deletes the key even when Porro doesn’t answer, and says Porro wasn’t told', function () {
+        $porro = porroFake(['disconnect' => [503, []]]);
+        connected();
+
+        $html = html_entity_decode(disconnect($this, sam())->assertSuccessful()->html(), ENT_QUOTES);
+
+        expect($porro['disconnects'])->not->toBeEmpty()
+            ->and((new SiteKeys)->token())->toBeNull()
+            ->and($html)
+            ->toContain('Disconnected on this site')
+            ->toContain('The key has been deleted and reports have stopped. Porro didn’t answer, so it hasn’t been told: Marlowe Studio will see this site as not reporting, not as disconnected.')
+            ->toContain('Not connected to Porro')
+            ->not->toContain('Disconnected from Marlowe Studio');
+    });
+
+    it('counts a key Porro already turns away as told', function () {
+        porroFake(['disconnect' => [401, ['ok' => false, 'error' => 'Invalid signature.']]]);
+        connected();
+
+        expect(html_entity_decode(disconnect($this, sam())->html(), ENT_QUOTES))->toContain('Disconnected from Marlowe Studio')
+            ->and((new SiteKeys)->token())->toBeNull();
+    });
+
+    it('says Porro when the workspace isn’t known', function () {
+        porroFake();
+        connected(workspace: null, host: null);
+        $this->actingAs(sam());
+
+        $page = Livewire::test(SiteHealthPage::class)->call('mountAction', 'disconnectFromPorro');
+        $action = $page->instance()->getMountedAction();
+
+        expect($action->getModalHeading())->toBe('Disconnect this site from Porro?')
+            ->and($action->getModalDescription())->toBe('This site stops sending reports to Porro, and its key is deleted from this site.')
+            ->and($action->getModalContent()->render())->toContain('Porro keeps the site and its history.')
+            ->and(html_entity_decode($page->call('callMountedAction')->html(), ENT_QUOTES))
+            ->toContain('Disconnected from Porro')
+            ->toContain('Porro still has the site in Porro; someone in that workspace can remove it there.');
+    });
+
+    it('needs more than viewing', function () {
+        $porro = porroFake();
+        connected();
+        $user = viewer();
+
+        disconnect($this, $user);
+
+        expect($porro['disconnects'])->toBeEmpty()
+            ->and((new SiteKeys)->token())->not->toBeNull()
+            ->and(siteHealth($this, $user))->toContain('Connected to Marlowe Studio');
+    });
+
+    it('lets the panel say who may disconnect, as it does for connecting', function () {
+        $porro = porroFake();
+        connected();
+        PorroPlugin::current()->authorizeConnect(fn ($user) => $user->email === 'priya@example.com');
+
+        disconnect($this, sam());
+        expect($porro['disconnects'])->toBeEmpty()
+            ->and((new SiteKeys)->token())->not->toBeNull();
+
+        disconnect($this, viewer());
+        expect($porro['disconnects'])->toHaveCount(1)
+            ->and((new SiteKeys)->token())->toBeNull();
+    });
+
+    it('is never offered for a key from the environment', function () {
+        $porro = porroFake();
+        // Even with a key in the database underneath it.
+        connected();
+        config(['porro.key' => siteKey()]);
+        $user = sam();
+
+        disconnect($this, $user);
+
+        expect(SiteHealthPage::canDisconnect())->toBeFalse()
+            ->and($porro['disconnects'])->toBeEmpty()
+            ->and(app(SiteKeys::class)->stored())->not->toBeNull()
+            ->and(siteHealth($this, $user))
+            ->toContain('To disconnect, remove PORRO_KEY from the environment and deploy. The control panel can’t change it.')
+            ->not->toContain('disconnectFromPorro')
+            ->not->toContain('Disconnected');
+    });
+
+    it('isn’t offered on a copy that isn’t the live site', function () {
+        $porro = porroFake();
+        // A copy of the live database: its key is the live site's.
+        connected();
+        $this->app['env'] = 'staging';
+        $user = sam();
+
+        expect(siteHealth($this, $user))->toContain('This is a development copy')->not->toContain('disconnectFromPorro');
+
+        disconnect($this, $user);
+
+        expect($porro['disconnects'])->toBeEmpty()
+            ->and((new SiteKeys)->token())->not->toBeNull();
+    });
+});
+
+describe('a key Porro turned away', function () {
+    beforeEach(function () {
+        porroFake();
+        config(['app.timezone' => 'Europe/London']);
+        Carbon::setTestNow(Carbon::parse('2026-11-16 14:02:00', 'Europe/London'));
+
+        connected();
+        app(SiteKeys::class)->turnAway();
+    });
+
+    afterEach(fn () => Carbon::setTestNow());
+
+    it('says what happened and when, with the button to connect again', function () {
+        expect(siteHealth($this, sam()))
+            ->toContain('No longer connected to Porro')
+            ->toContain('Porro turned this site’s key away')
+            ->toContain('The site was removed from Marlowe Studio, or given a new key there.')
+            ->toContain('Reports stopped on 16 November at 14:02.')
+            ->toContain('The old key has been deleted from this site.')
+            ->toContain('Connect again to carry on. Opens porro.test to sign in and approve.')
+            ->toContain('wire:click="connectToPorro"')
+            ->not->toContain('Not connected to Porro')
+            ->not->toContain('Have this site checked every hour')
+            ->not->toContain('disconnectFromPorro')
+            ->not->toContain('Watch this site from outside too');
+    });
+
+    it('keeps the wording and leaves the button out for someone who can only view', function () {
+        expect(siteHealth($this, viewer()))
+            ->toContain('No longer connected to Porro')
+            ->toContain('Porro turned this site’s key away')
+            ->not->toContain('wire:click="connectToPorro"')
+            ->not->toContain('Watch this site from outside too');
+    });
+
+    it('keeps the wording and leaves the button out on a copy that isn’t the live site', function () {
+        $this->app['env'] = 'staging';
+
+        expect(siteHealth($this, sam()))
+            ->toContain('No longer connected to Porro')
+            ->toContain('Porro turned this site’s key away')
+            ->not->toContain('wire:click="connectToPorro"')
+            ->not->toContain('This is a development copy');
+    });
+
+    it('says Porro when the workspace isn’t known', function () {
+        connected(workspace: null);
+        app(SiteKeys::class)->turnAway();
+
+        expect(siteHealth($this, sam()))->toContain('The site was removed from Porro, or given a new key there.');
+    });
+
+    it('stays until the site connects again', function () {
+        $user = sam();
+
+        expect(siteHealth($this, $user))->toContain('No longer connected to Porro');
+
+        connected();
+
+        expect(siteHealth($this, $user))
+            ->toContain('Connected to Marlowe Studio')
+            ->not->toContain('No longer connected to Porro')
+            ->not->toContain('Porro turned this site’s key away');
+    });
+
+    it('says nothing of it once the key is in the environment', function () {
+        config(['porro.key' => siteKey()]);
+
+        expect(siteHealth($this, sam()))
+            ->toContain('From Porro')
+            ->not->toContain('No longer connected to Porro');
     });
 });
 
